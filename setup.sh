@@ -559,10 +559,164 @@ EOF
 	ensure_env_sudo_wrapper
 }
 
+pf_reconcile_order() {
+	[[ -f "$ENV_FILE" ]] || return 0
+
+	local android_home="" sdkman_dir="" java_home="" default_ruby=""
+	local -a misc_lines=()
+	local in_sudo=false in_sdkman_silencer=false
+
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		line="${line%$'\n'}"
+		line="${line%$'\r'}"
+		
+		if [[ "$line" == "sudo() {"* ]]; then
+			in_sudo=true
+			continue
+		fi
+		if [[ "$in_sudo" == "true" ]]; then
+			if [[ "$line" == "}"* ]]; then
+				in_sudo=false
+			fi
+			continue
+		fi
+
+		if [[ "$line" == "if declare -f sdkman_auto_env"* || "$line" == "# Custom silent SDKMAN auto-env implementation"* ]]; then
+			in_sdkman_silencer=true
+			continue
+		fi
+		if [[ "$in_sdkman_silencer" == "true" ]]; then
+			if [[ "$line" == "fi"* && "$line" == "fi" || "$line" == "# End custom silent SDKMAN auto-env implementation"* ]]; then
+				in_sdkman_silencer=false
+			fi
+			continue
+		fi
+
+		if [[ "$line" == *"if [[ -d \"/opt/homebrew/bin\""* || "$line" == *"export PATH=\"/opt/homebrew/bin"* || "$line" == "fi" || "$line" == "# Custom sudo wrapper"* ]]; then
+			continue
+		fi
+
+		if [[ "$line" == "export ANDROID_HOME="* ]]; then
+			android_home=$(echo "$line" | sed -E 's/^export ANDROID_HOME="?([^"]*)"?/\1/')
+		elif [[ "$line" == "export SDKMAN_DIR="* ]]; then
+			sdkman_dir=$(echo "$line" | sed -E 's/^export SDKMAN_DIR="?([^"]*)"?/\1/')
+		elif [[ "$line" == "export JAVA_HOME="* ]]; then
+			java_home=$(echo "$line" | sed -E 's/^export JAVA_HOME="?([^"]*)"?/\1/')
+		elif [[ "$line" == "chruby ruby-"* ]]; then
+			default_ruby="$line"
+		elif [[ "$line" == "source "* && "$line" == *"chruby.sh" ]]; then
+			continue
+		elif [[ "$line" == "source "* && "$line" == *"auto.sh" ]]; then
+			continue
+		elif [[ "$line" == *"sdkman-init.sh"* ]]; then
+			continue
+		elif [[ "$line" == *"fnm env"* ]]; then
+			continue
+		elif [[ "$line" == "export PATH="* && "$line" == *"\$ANDROID_HOME"* ]]; then
+			continue
+		elif [[ -n "${line//[[:space:]]/}" ]]; then
+			misc_lines+=("$line")
+		fi
+	done < "$ENV_FILE"
+
+	[[ -z "$sdkman_dir" ]] && sdkman_dir="\$HOME/.sdkman"
+	[[ -z "$java_home" ]] && java_home="\$HOME/.sdkman/candidates/java/current"
+	[[ -z "$android_home" && -d "$HOME/Library/Android/Sdk" ]] && android_home="\$HOME/Library/Android/Sdk"
+
+	if [[ -f "$HOME/.sdkman/etc/config" ]]; then
+		sed -i '' 's/sdkman_auto_env=true/sdkman_auto_env=false/g' "$HOME/.sdkman/etc/config" 2>/dev/null || true
+	fi
+
+	local tmp
+	tmp=$(mktemp)
+	
+	cat << 'EOF' > "$tmp"
+if [[ -d "/opt/homebrew/bin" && ! "$PATH" =~ "/opt/homebrew/bin" ]]; then
+	export PATH="/opt/homebrew/bin:$PATH"
+fi
+EOF
+
+	cat << 'EOF' >> "$tmp"
+
+# Custom sudo wrapper to show password prompts cleanly on the line below
+sudo() {
+	local has_n=false
+	for arg in "$@"; do
+		if [[ "$arg" == "-n" ]]; then
+			has_n=true
+			break
+		fi
+	done
+	if [[ "$has_n" == "false" && -t 0 && -t 2 ]]; then
+		local c_y=$'\033[1;33m' c_c=$'\033[1;36m' c_w=$'\033[1;37m' c_reset=$'\033[0m'
+		local prompt
+		prompt=$'\n'"${c_y}┌────────────────────────────────────────┐${c_reset}"$'\n'
+		prompt+="${c_y}│  🔑 [SUDO] PRIVILÉGIOS REQUERIDOS       │${c_reset}"$'\n'
+		prompt+="${c_y}└────────────────────────────────────────┘${c_reset}"$'\n'
+		prompt+="${c_w}Digite a senha para o usuário ${c_c}%u${c_w}:${c_reset}"$'\n❯ '
+		command sudo -p "$prompt" "$@"
+	else
+		command sudo "$@"
+	fi
+}
+EOF
+
+	echo "" >> "$tmp"
+	[[ -n "$android_home" ]] && echo "export ANDROID_HOME=\"$android_home\"" >> "$tmp"
+	echo "export SDKMAN_DIR=\"$sdkman_dir\"" >> "$tmp"
+	echo "export JAVA_HOME=\"$java_home\"" >> "$tmp"
+
+	echo "" >> "$tmp"
+	echo "source $BREW_PREFIX/opt/chruby/share/chruby/chruby.sh" >> "$tmp"
+	echo "source $BREW_PREFIX/opt/chruby/share/chruby/auto.sh" >> "$tmp"
+	echo "[[ -s \"\$SDKMAN_DIR/bin/sdkman-init.sh\" ]] && source \"\$SDKMAN_DIR/bin/sdkman-init.sh\" >/dev/null" >> "$tmp"
+	cat << 'EOF' >> "$tmp"
+# Custom silent SDKMAN auto-env implementation
+sdkman_auto_env() {
+	if [[ -n $SDKMAN_ENV ]] && [[ ! $PWD =~ ^$SDKMAN_ENV ]]; then
+		sdk env clear >/dev/null 2>&1
+	fi
+	if [[ -f .sdkmanrc ]]; then
+		sdk env >/dev/null 2>&1
+	fi
+}
+
+if [[ -n "$ZSH_VERSION" ]]; then
+	if [[ ! " ${chpwd_functions[@]} " =~ " sdkman_auto_env " ]]; then
+		chpwd_functions+=(sdkman_auto_env)
+	fi
+elif [[ -n "$BASH_VERSION" ]]; then
+	if [[ ! "$PROMPT_COMMAND" =~ "sdkman_auto_env" ]]; then
+		trimmed_prompt_command="${PROMPT_COMMAND%"${PROMPT_COMMAND##*[![:space:]]}"}"
+		[[ -z "$trimmed_prompt_command" ]] && PROMPT_COMMAND="sdkman_auto_env" || PROMPT_COMMAND="${trimmed_prompt_command%\;};sdkman_auto_env"
+	fi
+fi
+
+# Run once at startup silently
+sdkman_auto_env
+# End custom silent SDKMAN auto-env implementation
+EOF
+	echo "if command -v fnm &>/dev/null; then eval \"\$(fnm env --use-on-cd --log-level=quiet)\"; fi" >> "$tmp"
+
+	echo "" >> "$tmp"
+	echo "export PATH=\"\$ANDROID_HOME/emulator:\$ANDROID_HOME/platform-tools:\$PATH\"" >> "$tmp"
+	[[ -n "$default_ruby" ]] && echo "$default_ruby" >> "$tmp"
+
+	if [[ ${#misc_lines[@]} -gt 0 ]]; then
+		echo "" >> "$tmp"
+		for ml in "${misc_lines[@]}"; do
+			echo "$ml" >> "$tmp"
+		done
+	fi
+
+	mv "$tmp" "$ENV_FILE"
+}
+
 pf_add() {
 	local l="$1"
 	pf_init
 	grep -qxF "$l" "$ENV_FILE" 2>/dev/null || echo "$l" >>"$ENV_FILE"
+	pf_reconcile_order
 	local sl="[[ -f $ENV_FILE ]] && source $ENV_FILE" tr
 	tr=$(get_target_rc)
 	if [[ -f "$tr" || "$tr" == *".zshrc" || "$tr" == *".bash_profile" ]]; then
@@ -578,11 +732,13 @@ pf_set_env() {
 	pf_init
 	sed -i '' "/^export ${k}=/d" "$ENV_FILE" 2>/dev/null || true
 	echo "export ${k}=\"${v}\"" >>"$ENV_FILE"
+	pf_reconcile_order
 }
 
 pf_rm_pat() {
 	local p="$1"
 	[[ -f "$ENV_FILE" ]] && sed -i '' "/${p}/d" "$ENV_FILE" 2>/dev/null || true
+	pf_reconcile_order
 }
 
 _scrub_profile_file() {
@@ -1412,7 +1568,11 @@ generate_brewfile() {
 	local bf="/tmp/mac-dev.Brewfile"
 	: >"$bf"
 	local -a cur
-	readarray -t cur < <(jq -r '.tools | if type=="object" then keys[] else empty end' "$CATALOG_FILE" 2>/dev/null || true)
+	if is_inside_project; then
+		readarray -t cur < <(get_managed_tools_list)
+	else
+		readarray -t cur < <(jq -r '.tools | if type=="object" then keys[] else empty end' "$CATALOG_FILE" 2>/dev/null || true)
+	fi
 	for t in "${cur[@]}"; do
 		local lock_status
 		lock_status=$(jq -r ".tools[\"$t\"].status // empty" "$LOCK_FILE" 2>/dev/null || true)
@@ -1525,6 +1685,7 @@ install_managed() {
 	sdkman)
 		[[ -d "$SDKMAN_DIR" ]] || retry 3 "$BREW_BASH" -c "curl -sL 'https://get.sdkman.io?rcupdate=false' | '$BREW_BASH'"
 		sed -i '' 's/sdkman_auto_answer=false/sdkman_auto_answer=true/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
+		sed -i '' 's/sdkman_auto_env=true/sdkman_auto_env=false/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
 		pf_set_env "SDKMAN_DIR" "\$HOME/.sdkman"
 		pf_add "[[ -s \"\$SDKMAN_DIR/bin/sdkman-init.sh\" ]] && source \"\$SDKMAN_DIR/bin/sdkman-init.sh\""
 		pf_set_env "JAVA_HOME" "\$HOME/.sdkman/candidates/java/current"
@@ -2350,14 +2511,18 @@ ensure_project_version_files() {
 		local current_nv=""
 		[[ -f ".node-version" ]] && current_nv=$(tr -d '[:space:]' < ".node-version" 2>/dev/null)
 		if [[ "$current_nv" != "$node_v" ]]; then
-			echo "$node_v" > ".node-version"
+			if [[ "$DRY_RUN" != "1" ]]; then
+				echo "$node_v" > ".node-version"
+			fi
 			msg "$C_G" "📝 .node-version → $node_v${current_nv:+ (era $current_nv)}"
 			any_created=true
 		fi
 	fi
 
 	if [[ -n "$ruby_v" && ! -f ".ruby-version" ]]; then
-		echo "$ruby_v" > ".ruby-version"
+		if [[ "$DRY_RUN" != "1" ]]; then
+			echo "$ruby_v" > ".ruby-version"
+		fi
 		msg "$C_G" "📝 .ruby-version → $ruby_v"
 		any_created=true
 	fi
@@ -2384,17 +2549,23 @@ ensure_project_version_files() {
 		fi
 
 		if [[ ! -f ".sdkmanrc" ]]; then
-			printf 'java=%s\n' "$resolved_java" > ".sdkmanrc"
+			if [[ "$DRY_RUN" != "1" ]]; then
+				printf 'java=%s\n' "$resolved_java" > ".sdkmanrc"
+			fi
 			msg "$C_G" "📝 .sdkmanrc → java=$resolved_java"
 			any_created=true
 		elif [[ "$current_jv" != "$resolved_java" && ( "$current_jv" == "$java_v" || ! "$current_jv" == *-* ) ]]; then
-			sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
+			if [[ "$DRY_RUN" != "1" ]]; then
+				sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
+			fi
 			msg "$C_G" "📝 .sdkmanrc → java=$resolved_java (atualizado de $current_jv)"
 			any_created=true
 		fi
 		if [[ -f "$SDKMAN_DIR/etc/config" ]]; then
-			grep -q 'sdkman_auto_env=true' "$SDKMAN_DIR/etc/config" 2>/dev/null || \
-				sed -i '' 's/sdkman_auto_env=false/sdkman_auto_env=true/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
+			if [[ "$DRY_RUN" != "1" ]]; then
+				grep -q 'sdkman_auto_env=true' "$SDKMAN_DIR/etc/config" 2>/dev/null || \
+					sed -i '' 's/sdkman_auto_env=false/sdkman_auto_env=true/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
+			fi
 		fi
 	fi
 
@@ -2413,6 +2584,11 @@ ensure_corepack_project_yarn() {
 	# Only for yarn v2+ (v1 uses npm global install)
 	local major="${yarn_v%%.*}"
 	[[ "$major" -lt 2 ]] 2>/dev/null && return 0
+
+	if [[ "$DRY_RUN" == "1" ]]; then
+		msg "$C_G" "📦 corepack → yarn@$yarn_v (simulado)"
+		return 0
+	fi
 
 	if ! command -v corepack &>/dev/null; then
 		command -v npm &>/dev/null && npm install -g corepack@latest &>/dev/null || return 0
@@ -2637,7 +2813,9 @@ sync_project_context() {
 			local nvmrc_v
 			nvmrc_v=$(grep -oE '[0-9.]+' .nvmrc | head -1 || echo "")
 			if is_smaller_version "$nvmrc_v" "$max_node"; then
-				echo "$max_node" > ".nvmrc"
+				if [[ "$DRY_RUN" != "1" ]]; then
+					echo "$max_node" > ".nvmrc"
+				fi
 				msg "$C_G" "📝 .nvmrc → $max_node (atualizado de $nvmrc_v)"
 			fi
 		fi
@@ -2645,7 +2823,9 @@ sync_project_context() {
 			local nv_v
 			nv_v=$(tr -d '[:space:]' < ".node-version" 2>/dev/null || echo "")
 			if is_smaller_version "$nv_v" "$max_node"; then
-				echo "$max_node" > ".node-version"
+				if [[ "$DRY_RUN" != "1" ]]; then
+					echo "$max_node" > ".node-version"
+				fi
 				msg "$C_G" "📝 .node-version → $max_node (atualizado de $nv_v)"
 			fi
 		fi
@@ -2656,7 +2836,11 @@ sync_project_context() {
 				local tmp
 				tmp=$(mktemp)
 				if jq --arg v "$max_node" '.engines.node = $v' package.json > "$tmp" 2>/dev/null; then
-					mv "$tmp" package.json
+					if [[ "$DRY_RUN" != "1" ]]; then
+						mv "$tmp" package.json
+					else
+						rm -f "$tmp"
+					fi
 					msg "$C_G" "📝 package.json (.engines.node) → $max_node (atualizado de $pkg_node)"
 				else
 					rm -f "$tmp"
@@ -2671,7 +2855,9 @@ sync_project_context() {
 			local rv_v
 			rv_v=$(sed -E 's/^ruby-//;s/[[:space:]]//g' .ruby-version || echo "")
 			if is_smaller_version "$rv_v" "$max_ruby"; then
-				echo "$max_ruby" > ".ruby-version"
+				if [[ "$DRY_RUN" != "1" ]]; then
+					echo "$max_ruby" > ".ruby-version"
+				fi
 				msg "$C_G" "📝 .ruby-version → $max_ruby (atualizado de $rv_v)"
 			fi
 		fi
@@ -2682,7 +2868,11 @@ sync_project_context() {
 				local tmp
 				tmp=$(mktemp)
 				if jq --arg v "$max_ruby" '.rubyVersion = $v' package.json > "$tmp" 2>/dev/null; then
-					mv "$tmp" package.json
+					if [[ "$DRY_RUN" != "1" ]]; then
+						mv "$tmp" package.json
+					else
+						rm -f "$tmp"
+					fi
 					msg "$C_G" "📝 package.json (.rubyVersion) → $max_ruby (atualizado de $pkg_ruby)"
 				else
 					rm -f "$tmp"
@@ -2716,7 +2906,9 @@ sync_project_context() {
 						fi
 					fi
 				fi
-				sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
+				if [[ "$DRY_RUN" != "1" ]]; then
+					sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
+				fi
 				msg "$C_G" "📝 .sdkmanrc → java=$resolved_java (atualizado de $sdk_v)"
 			fi
 		fi
@@ -2727,7 +2919,11 @@ sync_project_context() {
 				local tmp
 				tmp=$(mktemp)
 				if jq --arg v "$max_java" '.javaVersion = $v' package.json > "$tmp" 2>/dev/null; then
-					mv "$tmp" package.json
+					if [[ "$DRY_RUN" != "1" ]]; then
+						mv "$tmp" package.json
+					else
+						rm -f "$tmp"
+					fi
 					msg "$C_G" "📝 package.json (.javaVersion) → $max_java (atualizado de $pkg_java)"
 				else
 					rm -f "$tmp"
@@ -2745,7 +2941,11 @@ sync_project_context() {
 				local tmp
 				tmp=$(mktemp)
 				if jq --arg v "yarn@$max_yarn" '.packageManager = $v' package.json > "$tmp" 2>/dev/null; then
-					mv "$tmp" package.json
+					if [[ "$DRY_RUN" != "1" ]]; then
+						mv "$tmp" package.json
+					else
+						rm -f "$tmp"
+					fi
 					msg "$C_G" "📝 package.json (.packageManager) → yarn@$max_yarn (atualizado de yarn@$pkg_yarn)"
 				else
 					rm -f "$tmp"
