@@ -267,6 +267,7 @@ process_tool() {
 			case "$mgr" in
 			mise)
 				run_step "Removendo" "$tool" "versões do ${tool^}" "versões do ${tool^}" "removed" mise uninstall --all "$tool" || audit_log missing "$tool"
+				brew list "$tool" &>/dev/null && run_bg "Limpando" "$tool" brew uninstall --force "$tool" || true
 				;;
 			xcodes)
 				local -a x_vers=()
