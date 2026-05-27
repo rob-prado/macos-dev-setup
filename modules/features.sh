@@ -266,7 +266,7 @@ process_tool() {
 			mgr=$(c_get "$tool" "manager")
 			case "$mgr" in
 			mise)
-				run_step "Removendo" "$tool" "versões do ${tool^}" "versões do ${tool^}" "removed" mise prune "$tool" || audit_log missing "$tool"
+				run_step "Removendo" "$tool" "versões do ${tool^}" "versões do ${tool^}" "removed" mise uninstall --all "$tool" || audit_log missing "$tool"
 				;;
 			xcodes)
 				local -a x_vers=()
