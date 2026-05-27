@@ -31,6 +31,9 @@ clean_folders_job() {
 	rm -rf ~/.nvm \
 		~/.nodenv \
 		~/.rubies \
+		~/.fnm \
+		~/.sdkman \
+		~/.corepack \
 		~/.cache/yarn \
 		~/.yarn \
 		/Applications/Xcode*.app 2>/dev/null || true
