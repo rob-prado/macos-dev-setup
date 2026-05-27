@@ -107,30 +107,40 @@ register_tool_state() {
 catalog_reconcile() {
 	local -a current
 	readarray -t current < <(jq -r '.tools | if type=="object" then keys[] else empty end' "$CATALOG_FILE" 2>/dev/null || true)
+
+	local brew_formulas brew_casks gem_pkgs
+	brew_formulas=$(brew list --formula --versions 2>/dev/null || true)
+	brew_casks=$(brew list --cask --versions 2>/dev/null || true)
+	if command -v gem &>/dev/null; then
+		gem_pkgs=$(run_in_ruby_env "gem list -l" 2>/dev/null || true)
+	fi
+
 	for t in "${current[@]}"; do
 		[[ -z "${t:-}" ]] && continue
 		local type
 		type=$(c_get "$t" "type")
 		if [[ "$type" == "formula" || "$type" == "cask" ]]; then
-			if brew list "${type:+--$type}" "$t" &>/dev/null; then
-				local ver
-				ver=$(brew list "${type:+--$type}" --versions "$t" 2>/dev/null | awk '{print $NF}' || true)
-				if [[ -n "$ver" ]]; then
-					_jq_update ".tools[\"$t\"].version = \"$ver\""
-					update_lock_entry "$t" "$ver" "installed"
-				fi
+			local ver=""
+			if [[ "$type" == "formula" ]]; then
+				ver=$(echo "$brew_formulas" | awk -v pkg="^$t\$" '$1 ~ pkg {print $NF}' || true)
+			else
+				ver=$(echo "$brew_casks" | awk -v pkg="^$t\$" '$1 ~ pkg {print $NF}' || true)
+			fi
+			if [[ -n "$ver" ]]; then
+				_jq_update ".tools[\"$t\"].version = \"$ver\""
+				update_lock_entry "$t" "$ver" "installed"
 			else
 				_jq_update ".tools[\"$t\"].version = \"\""
 				update_lock_entry "$t" "" "removed"
 			fi
 		elif [[ "$type" == "gem" ]]; then
-			if command -v gem &>/dev/null && run_in_ruby_env "gem list -i '${t}' &>/dev/null" 2>/dev/null; then
-				local ver
-				ver=$(run_in_ruby_env "gem list -e '${t}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1" 2>/dev/null || true)
-				if [[ -n "$ver" ]]; then
-					_jq_update ".tools[\"$t\"].version = \"$ver\""
-					update_lock_entry "$t" "$ver" "installed"
-				fi
+			local ver=""
+			if [[ -n "${gem_pkgs:-}" ]]; then
+				ver=$(echo "$gem_pkgs" | grep -iE "^${t} \(" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+			fi
+			if [[ -n "$ver" ]]; then
+				_jq_update ".tools[\"$t\"].version = \"$ver\""
+				update_lock_entry "$t" "$ver" "installed"
 			else
 				_jq_update ".tools[\"$t\"].version = \"\""
 				update_lock_entry "$t" "" "removed"
