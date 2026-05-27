@@ -148,99 +148,7 @@ render_markdown() {
 # 03. LOGGING, AUDITING & METRICS
 # ==============================================================================
 
-get_local_timestamp() {
-	local tz
-	tz=$(date +%z)
-	printf "%s%s:%s" "$(date +%Y-%m-%dT%H:%M:%S)" "${tz:0:3}" "${tz:3:2}"
-}
-
-log_event() {
-	local level="$1" message="$2" tool="${3:-}" details="${4:-}"
-	mkdir -p "$LOG_DIR"
-	local jsonl_file
-	jsonl_file="$LOG_DIR/$(date +%Y%m%d).jsonl"
-	local entry
-	entry=$(jq -nc --arg ts "$(get_local_timestamp)" --arg level "$level" --arg msg "$message" --arg tool "$tool" --arg details "$details" '{timestamp:$ts,level:$level,message:$msg,tool:$tool,details:$details}' 2>/dev/null) || return 0
-	echo "$entry" >>"$jsonl_file"
-	[[ "$VERBOSE" == "1" ]] && printf "%s\n" "$entry" || true
-}
-
-audit_log() {
-	local status="$1" item="$2"
-	printf "[%s] %s: %s\n" "$(get_local_timestamp)" "$status" "$item" >>"${CATALOG_FILE%.json}.log"
-	log_event "info" "$status" "$item" ""
-	case "$status" in
-	installed)
-		AUDIT_INSTALLED+=("$item")
-		;;
-	updated)
-		AUDIT_UPDATED+=("$item")
-		;;
-	uptodate)
-		AUDIT_UPTODATE+=("$item")
-		;;
-	skipped)
-		AUDIT_SKIPPED+=("$item")
-		;;
-	removed)
-		AUDIT_REMOVED+=("$item")
-		;;
-	missing)
-		AUDIT_MISSING+=("$item")
-		;;
-	failed)
-		AUDIT_FAILED+=("$item")
-		;;
-	esac
-}
-
-audit_report() {
-	local ti=${#AUDIT_INSTALLED[@]}
-	local tu=${#AUDIT_UPDATED[@]}
-	local td=${#AUDIT_UPTODATE[@]}
-	local ts=${#AUDIT_SKIPPED[@]}
-	local tr=${#AUDIT_REMOVED[@]}
-	local tm=${#AUDIT_MISSING[@]}
-	local tf=${#AUDIT_FAILED[@]}
-	local md="# Relatório de Execução
-"
-	md+="| Status | Count |
-|---|---|
-"
-	md+="| ✅ Instalados | $ti |
-| 🔄 Atualizados | $tu |
-| ✔️ Uptodate | $td |
-| ⏭️ Skipped | $ts |
-| 🗑️ Removidos | $tr |
-| ℹ️ Ausentes | $tm |
-| ❌ Falhas | $tf |
-"
-	if [[ $tf -gt 0 ]]; then
-		md+="
-"
-		for i in "${AUDIT_FAILED[@]}"; do
-			md+="- \`$i\`
-"
-		done
-	fi
-	if [[ $ti -gt 0 ]]; then
-		md+="
-"
-		for i in "${AUDIT_INSTALLED[@]}"; do
-			md+="- \`$i\`
-"
-		done
-	fi
-	if [[ $tu -gt 0 ]]; then
-		md+="
-"
-		for i in "${AUDIT_UPDATED[@]}"; do
-			md+="- \`$i\`
-"
-		done
-	fi
-	render_markdown "$md"
-}
+source "$(dirname "${BASH_SOURCE[0]}")/modules/logging.sh"
 
 # ==============================================================================
 # 04. INTERACTIVE TERMINAL UI (TUI)
@@ -454,7 +362,7 @@ get_target_rc() {
 
 ensure_env_sudo_wrapper() {
 	if ! grep -q "sudo() {" "$ENV_FILE" 2>/dev/null; then
-		cat << 'EOF' >> "$ENV_FILE"
+		cat <<'EOF' >>"$ENV_FILE"
 
 # Custom sudo wrapper to show password prompts cleanly on the line below
 sudo() {
@@ -485,7 +393,7 @@ pf_init() {
 	mkdir -p "$ENV_DIR"
 	if [[ ! -f "$ENV_FILE" ]]; then
 		touch "$ENV_FILE"
-		cat << 'EOF' > "$ENV_FILE"
+		cat <<'EOF' >"$ENV_FILE"
 if [[ -d "/opt/homebrew/bin" && ! "$PATH" =~ "/opt/homebrew/bin" ]]; then
 	export PATH="/opt/homebrew/bin:$PATH"
 fi
@@ -493,12 +401,12 @@ EOF
 	elif ! grep -q "/opt/homebrew/bin" "$ENV_FILE" 2>/dev/null; then
 		local tmp
 		tmp=$(mktemp)
-		cat << 'EOF' > "$tmp"
+		cat <<'EOF' >"$tmp"
 if [[ -d "/opt/homebrew/bin" && ! "$PATH" =~ "/opt/homebrew/bin" ]]; then
 	export PATH="/opt/homebrew/bin:$PATH"
 fi
 EOF
-		cat "$ENV_FILE" >> "$tmp"
+		cat "$ENV_FILE" >>"$tmp"
 		mv "$tmp" "$ENV_FILE"
 	fi
 	ensure_env_sudo_wrapper
@@ -514,7 +422,7 @@ pf_reconcile_order() {
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		line="${line%$'\n'}"
 		line="${line%$'\r'}"
-		
+
 		if [[ "$line" == "sudo() {"* ]]; then
 			in_sudo=true
 			continue
@@ -562,7 +470,7 @@ pf_reconcile_order() {
 		elif [[ -n "${line//[[:space:]]/}" ]]; then
 			misc_lines+=("$line")
 		fi
-	done < "$ENV_FILE"
+	done <"$ENV_FILE"
 
 	[[ -z "$sdkman_dir" ]] && sdkman_dir="\$HOME/.sdkman"
 	[[ -z "$java_home" ]] && java_home="\$HOME/.sdkman/candidates/java/current"
@@ -574,14 +482,14 @@ pf_reconcile_order() {
 
 	local tmp
 	tmp=$(mktemp)
-	
-	cat << 'EOF' > "$tmp"
+
+	cat <<'EOF' >"$tmp"
 if [[ -d "/opt/homebrew/bin" && ! "$PATH" =~ "/opt/homebrew/bin" ]]; then
 	export PATH="/opt/homebrew/bin:$PATH"
 fi
 EOF
 
-	cat << 'EOF' >> "$tmp"
+	cat <<'EOF' >>"$tmp"
 
 # Custom sudo wrapper to show password prompts cleanly on the line below
 sudo() {
@@ -606,16 +514,16 @@ sudo() {
 }
 EOF
 
-	echo "" >> "$tmp"
-	[[ -n "$android_home" ]] && echo "export ANDROID_HOME=\"$android_home\"" >> "$tmp"
-	echo "export SDKMAN_DIR=\"$sdkman_dir\"" >> "$tmp"
-	echo "export JAVA_HOME=\"$java_home\"" >> "$tmp"
+	echo "" >>"$tmp"
+	[[ -n "$android_home" ]] && echo "export ANDROID_HOME=\"$android_home\"" >>"$tmp"
+	echo "export SDKMAN_DIR=\"$sdkman_dir\"" >>"$tmp"
+	echo "export JAVA_HOME=\"$java_home\"" >>"$tmp"
 
-	echo "" >> "$tmp"
-	echo "source $BREW_PREFIX/opt/chruby/share/chruby/chruby.sh" >> "$tmp"
-	echo "source $BREW_PREFIX/opt/chruby/share/chruby/auto.sh" >> "$tmp"
-	echo "[[ -s \"\$SDKMAN_DIR/bin/sdkman-init.sh\" ]] && source \"\$SDKMAN_DIR/bin/sdkman-init.sh\" >/dev/null" >> "$tmp"
-	cat << 'EOF' >> "$tmp"
+	echo "" >>"$tmp"
+	echo "source $BREW_PREFIX/opt/chruby/share/chruby/chruby.sh" >>"$tmp"
+	echo "source $BREW_PREFIX/opt/chruby/share/chruby/auto.sh" >>"$tmp"
+	echo "[[ -s \"\$SDKMAN_DIR/bin/sdkman-init.sh\" ]] && source \"\$SDKMAN_DIR/bin/sdkman-init.sh\" >/dev/null" >>"$tmp"
+	cat <<'EOF' >>"$tmp"
 # Custom silent SDKMAN auto-env implementation
 sdkman_auto_env() {
 	if [[ -n $SDKMAN_ENV ]] && [[ ! $PWD =~ ^$SDKMAN_ENV ]]; then
@@ -641,16 +549,16 @@ fi
 sdkman_auto_env
 # End custom silent SDKMAN auto-env implementation
 EOF
-	echo "if command -v fnm &>/dev/null; then eval \"\$(fnm env --use-on-cd --log-level=quiet)\"; fi" >> "$tmp"
+	echo "if command -v fnm &>/dev/null; then eval \"\$(fnm env --use-on-cd --log-level=quiet)\"; fi" >>"$tmp"
 
-	echo "" >> "$tmp"
-	echo "export PATH=\"\$ANDROID_HOME/emulator:\$ANDROID_HOME/platform-tools:\$PATH\"" >> "$tmp"
-	[[ -n "$default_ruby" ]] && echo "$default_ruby" >> "$tmp"
+	echo "" >>"$tmp"
+	echo "export PATH=\"\$ANDROID_HOME/emulator:\$ANDROID_HOME/platform-tools:\$PATH\"" >>"$tmp"
+	[[ -n "$default_ruby" ]] && echo "$default_ruby" >>"$tmp"
 
 	if [[ ${#misc_lines[@]} -gt 0 ]]; then
-		echo "" >> "$tmp"
+		echo "" >>"$tmp"
 		for ml in "${misc_lines[@]}"; do
-			echo "$ml" >> "$tmp"
+			echo "$ml" >>"$tmp"
 		done
 	fi
 
@@ -2454,10 +2362,10 @@ ensure_project_version_files() {
 
 	if [[ -n "$node_v" ]]; then
 		local current_nv=""
-		[[ -f ".node-version" ]] && current_nv=$(tr -d '[:space:]' < ".node-version" 2>/dev/null)
+		[[ -f ".node-version" ]] && current_nv=$(tr -d '[:space:]' <".node-version" 2>/dev/null)
 		if [[ "$current_nv" != "$node_v" ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
-				echo "$node_v" > ".node-version"
+				echo "$node_v" >".node-version"
 			fi
 			msg "$C_G" "📝 .node-version → $node_v${current_nv:+ (era $current_nv)}"
 			any_created=true
@@ -2466,7 +2374,7 @@ ensure_project_version_files() {
 
 	if [[ -n "$ruby_v" && ! -f ".ruby-version" ]]; then
 		if [[ "$DRY_RUN" != "1" ]]; then
-			echo "$ruby_v" > ".ruby-version"
+			echo "$ruby_v" >".ruby-version"
 		fi
 		msg "$C_G" "📝 .ruby-version → $ruby_v"
 		any_created=true
@@ -2495,11 +2403,11 @@ ensure_project_version_files() {
 
 		if [[ ! -f ".sdkmanrc" ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
-				printf 'java=%s\n' "$resolved_java" > ".sdkmanrc"
+				printf 'java=%s\n' "$resolved_java" >".sdkmanrc"
 			fi
 			msg "$C_G" "📝 .sdkmanrc → java=$resolved_java"
 			any_created=true
-		elif [[ "$current_jv" != "$resolved_java" && ( "$current_jv" == "$java_v" || ! "$current_jv" == *-* ) ]]; then
+		elif [[ "$current_jv" != "$resolved_java" && ("$current_jv" == "$java_v" || ! "$current_jv" == *-*) ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
 				sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
 			fi
@@ -2508,7 +2416,7 @@ ensure_project_version_files() {
 		fi
 		if [[ -f "$SDKMAN_DIR/etc/config" ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
-				grep -q 'sdkman_auto_env=true' "$SDKMAN_DIR/etc/config" 2>/dev/null || \
+				grep -q 'sdkman_auto_env=true' "$SDKMAN_DIR/etc/config" 2>/dev/null ||
 					sed -i '' 's/sdkman_auto_env=false/sdkman_auto_env=true/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
 			fi
 		fi
@@ -2571,7 +2479,7 @@ detect_project_tools() {
 		yarn_req=$(jq -r '.packageManager // empty' package.json 2>/dev/null | grep -oE 'yarn@([0-9.]+)' | sed 's/yarn@//' || echo "")
 		java_req=$(jq -r '.javaVersion // empty' package.json 2>/dev/null | grep -oE '[0-9]+' | head -1 || echo "")
 		ruby_req=$(jq -r '.rubyVersion // empty' package.json 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
-		
+
 		detected+=("node")
 		[[ -n "$yarn_req" ]] && detected+=("yarn")
 		[[ -n "$java_req" ]] && detected+=("java")
@@ -2664,7 +2572,7 @@ sync_project_context() {
 		yarn_req=$(jq -r '.packageManager // empty' package.json 2>/dev/null | grep -oE 'yarn@([0-9.]+)' | sed 's/yarn@//' || echo "")
 		java_req=$(jq -r '.javaVersion // empty' package.json 2>/dev/null | grep -oE '[0-9]+' | head -1 || echo "")
 		ruby_req=$(jq -r '.rubyVersion // empty' package.json 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
-		
+
 		detected+=("node${node_req:+:$node_req}")
 		[[ -n "$yarn_req" ]] && detected+=("yarn:$yarn_req")
 		[[ -n "$java_req" ]] && detected+=("java:$java_req")
@@ -2759,17 +2667,17 @@ sync_project_context() {
 			nvmrc_v=$(grep -oE '[0-9.]+' .nvmrc | head -1 || echo "")
 			if is_smaller_version "$nvmrc_v" "$max_node"; then
 				if [[ "$DRY_RUN" != "1" ]]; then
-					echo "$max_node" > ".nvmrc"
+					echo "$max_node" >".nvmrc"
 				fi
 				msg "$C_G" "📝 .nvmrc → $max_node (atualizado de $nvmrc_v)"
 			fi
 		fi
 		if [[ -f ".node-version" ]]; then
 			local nv_v
-			nv_v=$(tr -d '[:space:]' < ".node-version" 2>/dev/null || echo "")
+			nv_v=$(tr -d '[:space:]' <".node-version" 2>/dev/null || echo "")
 			if is_smaller_version "$nv_v" "$max_node"; then
 				if [[ "$DRY_RUN" != "1" ]]; then
-					echo "$max_node" > ".node-version"
+					echo "$max_node" >".node-version"
 				fi
 				msg "$C_G" "📝 .node-version → $max_node (atualizado de $nv_v)"
 			fi
@@ -2780,7 +2688,7 @@ sync_project_context() {
 			if is_smaller_version "$pkg_node" "$max_node"; then
 				local tmp
 				tmp=$(mktemp)
-				if jq --arg v "$max_node" '.engines.node = $v' package.json > "$tmp" 2>/dev/null; then
+				if jq --arg v "$max_node" '.engines.node = $v' package.json >"$tmp" 2>/dev/null; then
 					if [[ "$DRY_RUN" != "1" ]]; then
 						mv "$tmp" package.json
 					else
@@ -2801,7 +2709,7 @@ sync_project_context() {
 			rv_v=$(sed -E 's/^ruby-//;s/[[:space:]]//g' .ruby-version || echo "")
 			if is_smaller_version "$rv_v" "$max_ruby"; then
 				if [[ "$DRY_RUN" != "1" ]]; then
-					echo "$max_ruby" > ".ruby-version"
+					echo "$max_ruby" >".ruby-version"
 				fi
 				msg "$C_G" "📝 .ruby-version → $max_ruby (atualizado de $rv_v)"
 			fi
@@ -2812,7 +2720,7 @@ sync_project_context() {
 			if is_smaller_version "$pkg_ruby" "$max_ruby"; then
 				local tmp
 				tmp=$(mktemp)
-				if jq --arg v "$max_ruby" '.rubyVersion = $v' package.json > "$tmp" 2>/dev/null; then
+				if jq --arg v "$max_ruby" '.rubyVersion = $v' package.json >"$tmp" 2>/dev/null; then
 					if [[ "$DRY_RUN" != "1" ]]; then
 						mv "$tmp" package.json
 					else
@@ -2863,7 +2771,7 @@ sync_project_context() {
 			if is_smaller_version "$pkg_java" "$max_java"; then
 				local tmp
 				tmp=$(mktemp)
-				if jq --arg v "$max_java" '.javaVersion = $v' package.json > "$tmp" 2>/dev/null; then
+				if jq --arg v "$max_java" '.javaVersion = $v' package.json >"$tmp" 2>/dev/null; then
 					if [[ "$DRY_RUN" != "1" ]]; then
 						mv "$tmp" package.json
 					else
@@ -2885,7 +2793,7 @@ sync_project_context() {
 			if is_smaller_version "$pkg_yarn" "$max_yarn"; then
 				local tmp
 				tmp=$(mktemp)
-				if jq --arg v "yarn@$max_yarn" '.packageManager = $v' package.json > "$tmp" 2>/dev/null; then
+				if jq --arg v "yarn@$max_yarn" '.packageManager = $v' package.json >"$tmp" 2>/dev/null; then
 					if [[ "$DRY_RUN" != "1" ]]; then
 						mv "$tmp" package.json
 					else
@@ -3019,7 +2927,7 @@ sync_project_context() {
 		done
 		local -a unique_install_tools=()
 		readarray -t unique_install_tools < <(printf '%s\n' "${install_tools[@]}" | sort -u)
-		
+
 		declare -g -A ALREADY_INSTALLED
 		local -a all_tools
 		readarray -t all_tools < <(get_ordered_tools)
@@ -3610,4 +3518,3 @@ main() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 	main "$@"
 fi
-
