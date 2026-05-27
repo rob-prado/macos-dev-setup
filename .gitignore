@@ -1,1 +1,38 @@
+# macOS / Finder
 .DS_Store
+
+# Editor / IDE artefacts
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# Node / npm
+node_modules/
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Build artefacts
+dist/
+build/
+android/app/build/
+ios/DerivedData/
+Pods/
+
+# SDKMAN / local config (absolute paths are ignored by git, but guard against accidental adds)
+*.sdkmanrc
+.env
+.env.local
+.env.*.local
+
+# Generated environment helpers
+config/env.sh
+*.mac-dev-catalog.json
+*.mac-dev-catalog.lock
+
+# Log files
+*.log
