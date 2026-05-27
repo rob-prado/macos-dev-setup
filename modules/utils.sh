@@ -32,9 +32,11 @@ safe_curl() {
 
 run_in_ruby_env() {
 	local cmd="$1"
-	local ce
-	ce="set +u; [[ -f '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh' ]] && source '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh'; [[ -f '$BREW_PREFIX/opt/chruby/share/chruby/auto.sh' ]] && source '$BREW_PREFIX/opt/chruby/share/chruby/auto.sh'; if [[ -f .ruby-version ]]; then chruby \$(cat .ruby-version 2>/dev/null || true); else chruby \$(chruby | sed 's/ \*//' | sort -V | tail -1); fi"
-	"$BREW_BASH" -c "${ce}; ${cmd}"
+	if command -v mise &>/dev/null; then
+		mise exec ruby -- bash -c "$cmd"
+	else
+		bash -c "$cmd"
+	fi
 }
 
 retry() {

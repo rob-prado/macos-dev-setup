@@ -68,7 +68,12 @@ install_managed() {
 		for v in "${uv[@]}"; do
 			local success=false iv
 			local mise_ver="$v"
-			[[ "$tool" == "java" ]] && mise_ver="zulu-$v"
+			if [[ "$tool" == "java" ]]; then
+				mise_ver="zulu-$v"
+				if ! mise ls-remote java 2>/dev/null | grep -q "$mise_ver"; then
+					mise_ver="zulu-${v%%.*}"
+				fi
+			fi
 			
 			iv=$(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && $2=="'"$mise_ver"'"{print $2}' || true)
 			if [[ -n "$iv" ]]; then
@@ -197,7 +202,12 @@ uninstall_managed_version() {
 		case "$manager" in
 		fnm|sdkman|chruby|corepack)
 			local mise_ver="$v"
-			[[ "$tool" == "java" ]] && mise_ver="zulu-$v"
+			if [[ "$tool" == "java" ]]; then
+				mise_ver="zulu-$v"
+				if ! mise ls-remote java 2>/dev/null | grep -q "$mise_ver"; then
+					mise_ver="zulu-${v%%.*}"
+				fi
+			fi
 			run_step "Removendo" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
 			;;
 		xcodes)
