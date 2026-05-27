@@ -58,68 +58,13 @@ AUDIT_FAILED=()
 # 01. UTILITY & SYSTEM HELPERS
 # ==============================================================================
 
-cleanup() {
-	[[ "$HAS_LOCK" == "true" ]] && rm -rf "${LOCK_DIR:-/tmp/mac-dev-setup.lock.d}"
-	rm -rf "${CATALOG_FILE}.lock.d" \
-		"${LOCK_FILE}.lock.d" \
-		"${TMP_FILES[@]:-}" 2>/dev/null || true
-}
-
-ensure_modern_bash_and_deps() {
-	if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-		if [[ ! -x "$BREW_BASH" ]]; then
-			command -v brew >/dev/null 2>&1 || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" >/dev/null
-			eval "$("$BREW_PREFIX/bin/brew" shellenv)"
-			brew install bash jq zip unzip >/dev/null 2>&1 || true
-		fi
-		exec "$BREW_BASH" "$0" "$@"
-	fi
-	if ! command -v jq >/dev/null 2>&1; then
-		brew install jq zip unzip >/dev/null 2>&1 || {
-			printf '
-%s
-' "${C_R}❌ jq missing${C_RESET}" >&2
-			exit 1
-		}
-	fi
-}
-
-safe_curl() {
-	curl --connect-timeout 10 --max-time 30 "$@"
-}
-
-run_in_ruby_env() {
-	local cmd="$1"
-	local ce
-	ce="set +u; [[ -f '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh' ]] && source '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh'; [[ -f '$BREW_PREFIX/opt/chruby/share/chruby/auto.sh' ]] && source '$BREW_PREFIX/opt/chruby/share/chruby/auto.sh'; if [[ -f .ruby-version ]]; then chruby \$(cat .ruby-version 2>/dev/null || true); else chruby \$(chruby | sed 's/ \*//' | sort -V | tail -1); fi"
-	"$BREW_BASH" -c "${ce}; ${cmd}"
-}
-
-retry() {
-	local attempts="$1"
-	shift
-	local n=1 delay=2
-	until "$@"; do
-		((n >= attempts)) && return 1
-		sleep $((delay ** n))
-		((n++))
-	done
-}
-
-is_smaller_version() {
-	local v1="$1" v2="$2"
-	[[ -z "$v1" || -z "$v2" || "$v1" == "$v2" ]] && return 1
-	[[ "$(printf '%s\n%s' "$v1" "$v2" | sort -V | head -n 1)" == "$v1" ]]
-}
-
-notify() {
-	local title="$1" message="$2"
-	osascript -e "display notification \"$message\" with title \"$title\"" 2>/dev/null || true
-}
+source "$(dirname "${BASH_SOURCE[0]}")/modules/utils.sh"
 
 # ==============================================================================
 # 02. PRINTING & UI STYLING
 # ==============================================================================
+# Load modular UI functions
+source "$(dirname "${BASH_SOURCE[0]}")/modules/ui.sh"
 
 msg() {
 	printf "%b[%s]%b %b%s%b\n" "$C_D" "$(date +%H:%M:%S)" "$C_RESET" "$1" "$2" "$C_RESET"
