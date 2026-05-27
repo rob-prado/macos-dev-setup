@@ -41,25 +41,41 @@ audit_report() {
 	local tr=${#AUDIT_REMOVED[@]}
 	local tm=${#AUDIT_MISSING[@]}
 	local tf=${#AUDIT_FAILED[@]}
-	local md="# Relatório de Execução\n"
-	md+="| Status | Count |\n|---|---|\n"
-	md+="| ✅ Instalados | $ti |\n| 🔄 Atualizados | $tu |\n| ✔️ Uptodate | $td |\n| ⏭️ Skipped | $ts |\n| 🗑️ Removidos | $tr |\n| ℹ️ Ausentes | $tm |\n| ❌ Falhas | $tf |\n"
+	local md="# Relatório de Execução
+"
+	md+="| Status | Count |
+|---|---|
+"
+	md+="| ✅ Instalados | $ti |
+| 🔄 Atualizados | $tu |
+| ✔️ Uptodate | $td |
+| ⏭️ Skipped | $ts |
+| 🗑️ Removidos | $tr |
+| ℹ️ Ausentes | $tm |
+| ❌ Falhas | $tf |
+"
 	if [[ $tf -gt 0 ]]; then
-		md+="\n"
+		md+="
+"
 		for i in "${AUDIT_FAILED[@]}"; do
-			md+="- \`$i\`\n"
+			md+="- \`$i\`
+"
 			done
 	fi
 	if [[ $ti -gt 0 ]]; then
-		md+="\n"
+		md+="
+"
 		for i in "${AUDIT_INSTALLED[@]}"; do
-			md+="- \`$i\`\n"
+			md+="- \`$i\`
+"
 			done
 	fi
 	if [[ $tu -gt 0 ]]; then
-		md+="\n"
+		md+="
+"
 		for i in "${AUDIT_UPDATED[@]}"; do
-			md+="- \`$i\`\n"
+			md+="- \`$i\`
+"
 			done
 	fi
 	render_markdown "$md"

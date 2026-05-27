@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 export HOMEBREW_NO_ENV_HINTS=1
@@ -57,86 +65,86 @@ AUDIT_FAILED=()
 # 01. UTILITY & SYSTEM HELPERS
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/utils.sh"
+source "$SCRIPT_DIR/modules/utils.sh"
 
 # ==============================================================================
 # 02. PRINTING & UI STYLING
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/ui.sh"
+source "$SCRIPT_DIR/modules/ui.sh"
 
 # ==============================================================================
 # 03. LOGGING, AUDITING & METRICS
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/logging.sh"
+source "$SCRIPT_DIR/modules/logging.sh"
 
 # ==============================================================================
 # 04. INTERACTIVE TERMINAL UI (TUI)
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/tui.sh"
+source "$SCRIPT_DIR/modules/tui.sh"
 
 # ==============================================================================
 # 05. SHELL ENVIRONMENT CONFIGURATION (RC PROFILES)
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/env.sh"
+source "$SCRIPT_DIR/modules/env.sh"
 
 # ==============================================================================
 # 06. STATE DATABASE (JSON CATALOG & LOCKFILE)
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/catalog.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/modules/lock.sh"
+source "$SCRIPT_DIR/modules/catalog.sh"
+source "$SCRIPT_DIR/modules/lock.sh"
 
 # ==============================================================================
 # 07. RESOLUTION & METADATA (DEPENDENCY ENGINE)
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/metadata.sh"
+source "$SCRIPT_DIR/modules/metadata.sh"
 
 # ==============================================================================
 # 08. CONFLICTS, DRIFT & HEALTH CHECKS
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/health.sh"
+source "$SCRIPT_DIR/modules/health.sh"
 
 # ==============================================================================
 # 09. SNAPSHOT MANAGEMENT
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/snapshot.sh"
+source "$SCRIPT_DIR/modules/snapshot.sh"
 
 # ==============================================================================
 # 10. PROCESS RUNNERS & JOB CONTROLLERS
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/core.sh"
+source "$SCRIPT_DIR/modules/core.sh"
 
 # ==============================================================================
 # 11. PACKAGING SYSTEMS (BREW ENGINE)
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/brew.sh"
+source "$SCRIPT_DIR/modules/brew.sh"
 
 # ==============================================================================
 # 12. FEATURE OPERATIONS (INSTALL, UPDATE, UNINSTALL)
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/features.sh"
+source "$SCRIPT_DIR/modules/features.sh"
 
 # ==============================================================================
 # 13. CACHE PURGING & SYSTEM CLEANUP
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/cleanup.sh"
+source "$SCRIPT_DIR/modules/cleanup.sh"
 
 # ==============================================================================
 # 14. LOCAL PROJECT CONTEXT & SYNC
 # ==============================================================================
 
-source "$(dirname "${BASH_SOURCE[0]}")/modules/project.sh"
+source "$SCRIPT_DIR/modules/project.sh"
 
 # ==============================================================================
 # 15. CLI FLOW CONTROLLER & ENTRYPOINT
@@ -570,19 +578,19 @@ main() {
 
 	local -a menu_opts=()
 	if [[ $uninstalled_count -gt 0 ]]; then
-		menu_opts+=("Instalar Tudo 📥")
+		menu_opts+=("Instalar Tudo")
 	fi
 	if [[ $installed_count -gt 1 ]]; then
-		menu_opts+=("Atualizar Tudo 🔄")
+		menu_opts+=("Atualizar Tudo")
 	fi
-	menu_opts+=("Ação Seletiva ⚙️" "Adicionar Ferramenta 🔍")
+	menu_opts+=("Ação Seletiva" "Adicionar Ferramenta")
 	if [[ $installed_count -gt 1 ]]; then
-		menu_opts+=("Desinstalar Tudo 🗑️")
+		menu_opts+=("Desinstalar Tudo")
 	fi
-	menu_opts+=("Sair ❌")
+	menu_opts+=("Sair")
 
 	local opt
-	opt=$(tui_choose "🚀 macOS Dev Setup" "${menu_opts[@]}") || exit 0
+	opt=$(tui_choose "macOS Dev Setup" "${menu_opts[@]}") || exit 0
 	printf "🚀 macOS Dev Setup: %b%s%b\n" "$C_C" "$opt" "$C_RESET"
 
 	case "$opt" in

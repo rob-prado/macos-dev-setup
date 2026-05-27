@@ -9,11 +9,12 @@ tui_choose() {
     shift
     if [[ "$HAS_GUM" == "true" ]]; then
         local err_fd=2
-        { true > /dev/fd4; } 2>/dev/null && err_fd=4
+        { true >&4; } 2>/dev/null && err_fd=4
         local tmp
         tmp=$(mktemp)
         gum choose --header "$prompt" \
-            --cursor="  ❯  " \
+            --height=12 \
+            --cursor="> " \
             --cursor.foreground="#FFD700" \
             --selected.background="#3B82F6" \
             --selected.foreground="#FFFFFF" \
@@ -49,11 +50,12 @@ tui_multi_choose() {
     shift
     if [[ "$HAS_GUM" == "true" ]]; then
         local err_fd=2
-        { true > /dev/fd4; } 2>/dev/null && err_fd=4
+        { true >&4; } 2>/dev/null && err_fd=4
         local tmp
         tmp=$(mktemp)
         gum choose --no-limit --show-help --header "$prompt" \
-            --cursor="  ❯  " \
+            --height=12 \
+            --cursor="> " \
             --cursor.foreground="#FFD700" \
             --selected.background="#3B82F6" \
             --selected.foreground="#FFFFFF" \
@@ -85,7 +87,7 @@ tui_filter() {
     local prompt="$1"
     shift
     local err_fd=2
-    { true > /dev/fd4; } 2>/dev/null && err_fd=4
+    { true >&4; } 2>/dev/null && err_fd=4
     if [[ "$HAS_GUM" == "true" && "${TERM_PROGRAM:-}" != "Apple_Terminal" ]]; then
         local tmp
         tmp=$(mktemp)
@@ -132,7 +134,7 @@ tui_confirm() {
     if [[ "$HAS_GUM" == "true" ]]; then
         local pf="#56B9F8" sb="#6AAF50"
         local err_fd=2
-        { true > /dev/fd4; } 2>/dev/null && err_fd=4
+        { true >&4; } 2>/dev/null && err_fd=4
         [[ "$danger" == "true" ]] && {
             pf="#EF4444"
             sb="#EF4444"
@@ -157,7 +159,7 @@ tui_confirm() {
 tui_input() {
     local prompt="$1" placeholder="${2:-}"
     local err_fd=2
-    { true > /dev/fd4; } 2>/dev/null && err_fd=4
+    { true >&4; } 2>/dev/null && err_fd=4
     if [[ "$HAS_GUM" == "true" && "${TERM_PROGRAM:-}" != "Apple_Terminal" ]]; then
         local tmp
         tmp=$(mktemp)
