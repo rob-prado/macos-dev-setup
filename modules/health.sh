@@ -20,7 +20,7 @@ detect_drift() {
 			local mgr
 			mgr=$(c_get "$t" "manager")
 			case "$mgr" in
-			fnm|sdkman|chruby|corepack)
+			mise)
 				if command -v mise &>/dev/null; then
 					local -a installed wanted
 					readarray -t installed < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' || true)

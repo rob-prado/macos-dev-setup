@@ -23,12 +23,38 @@ migrate_catalog() {
 		fi
 		msg "$C_G" "✅ Migração concluída."
 	fi
+	if [[ "$current" -lt 3 ]]; then
+		msg "$C_C" "🔄 Migrando catálogo v$current → v3..."
+		local tmp
+		tmp=$(mktemp)
+		TMP_FILES+=("$tmp")
+		if jq \
+			--argjson sv 3 \
+			'. + {schema_version: $sv} | .tools |= with_entries(if .value.manager? and (.value.manager | in({"fnm":1,"sdkman":1,"chruby":1,"corepack":1})) then .value.manager = "mise" else . end)' \
+			"$CATALOG_FILE" >"$tmp"; then
+			mv "$tmp" "$CATALOG_FILE"
+			if [[ -f "$LOCK_FILE" ]]; then
+				local tmp_lock
+				tmp_lock=$(mktemp)
+				TMP_FILES+=("$tmp_lock")
+				if jq \
+					--argjson sv 3 \
+					'. + {schema_version: $sv} | .tools |= with_entries(if .value.manager? and (.value.manager | in({"fnm":1,"sdkman":1,"chruby":1,"corepack":1})) then .value.manager = "mise" else . end)' \
+					"$LOCK_FILE" >"$tmp_lock"; then
+					mv "$tmp_lock" "$LOCK_FILE"
+				fi
+			fi
+		else
+			rm -f "$tmp"
+		fi
+		msg "$C_G" "✅ Migração para v3 concluída."
+	fi
 }
 
 catalog_init() {
 	[[ -f "$CATALOG_FILE" ]] && return 0
 	cat <<EOF >"$CATALOG_FILE"
-{"schema_version":$CATALOG_SCHEMA_VERSION,"tools":{"watchman":{"type":"formula","version":""},"xcbeautify":{"type":"formula","version":""},"cocoapods":{"type":"gem","version":"","dependencies":["ruby"]},"node":{"type":"managed","manager":"fnm","versions":[]},"yarn":{"type":"managed","manager":"corepack","versions":[],"dependencies":["node"]},"java":{"type":"managed","manager":"sdkman","versions":[]},"ruby":{"type":"managed","manager":"chruby","versions":[]},"xcode":{"type":"managed","manager":"xcodes","versions":[]},"visual-studio-code":{"type":"cask","version":""},"reactotron":{"type":"cask","version":""},"android-studio":{"type":"cask","version":""}}}
+{"schema_version":$CATALOG_SCHEMA_VERSION,"tools":{"watchman":{"type":"formula","version":""},"xcbeautify":{"type":"formula","version":""},"cocoapods":{"type":"gem","version":"","dependencies":["ruby"]},"node":{"type":"managed","manager":"mise","versions":[]},"yarn":{"type":"managed","manager":"mise","versions":[],"dependencies":["node"]},"java":{"type":"managed","manager":"mise","versions":[]},"ruby":{"type":"managed","manager":"mise","versions":[]},"xcode":{"type":"managed","manager":"xcodes","versions":[]},"visual-studio-code":{"type":"cask","version":""},"reactotron":{"type":"cask","version":""},"android-studio":{"type":"cask","version":""}}}
 EOF
 }
 
@@ -151,7 +177,7 @@ catalog_reconcile() {
 			mgr=$(c_get "$t" "manager")
 			local -a vers=()
 			case "$mgr" in
-			fnm|sdkman|chruby|corepack)
+			mise)
 				if command -v mise &>/dev/null; then
 					is_installed=true
 					readarray -t vers < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' || true)

@@ -11,7 +11,7 @@ install_managed() {
 	brew list "$tool" &>/dev/null && run_bg "Limpando" "$tool" brew uninstall --force "$tool" || true
 
 	case "$manager" in
-	fnm|sdkman|chruby|corepack)
+	mise)
 		command -v mise &>/dev/null || retry 3 brew install mise
 		grep -q 'mise activate' "$ENV_FILE" 2>/dev/null || \
 			pf_add "eval \"\$(mise activate \${SHELL##*/})\""
@@ -40,7 +40,7 @@ install_managed() {
 	if [[ "$fetch_latest" == "true" ]]; then
 		local lv=""
 		case "$manager" in
-		fnm|sdkman|chruby|corepack)
+		mise)
 			if [[ "$tool" == "java" ]]; then
 				lv=$(mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru | head -1 || true)
 			else
@@ -64,7 +64,7 @@ install_managed() {
 	fi
 
 	case "$manager" in
-	fnm|sdkman|chruby|corepack)
+	mise)
 		for v in "${uv[@]}"; do
 			local success=false iv
 			local mise_ver="$v"
@@ -77,7 +77,8 @@ install_managed() {
 			
 			iv=$(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && $2=="'"$mise_ver"'"{print $2}' || true)
 			if [[ -n "$iv" ]]; then
-				printf '%s✓ %s %s ok%s
+				printf '
+%s✓ %s %s ok%s
 ' "${C_D}" "${tool^}" "$v" "${C_RESET}"
 				if [[ "$mode" == "update" ]]; then
 					audit_log uptodate "${tool^} $v"
@@ -102,7 +103,8 @@ install_managed() {
 			local ins success=false
 			ins=$(xcodes installed 2>/dev/null | grep -E "^$v" || true)
 			if [[ -n "${ins:-}" ]]; then
-				printf '%s✓ Xcode %s ok%s
+				printf '
+%s✓ Xcode %s ok%s
 ' "${C_D}" "$v" "${C_RESET}"
 				run_bg "Select" "Xcode $v" sudo xcodes select "$v" &>/dev/null || true
 				if [[ "$mode" == "update" ]]; then
@@ -144,7 +146,7 @@ uninstall_managed_version() {
 	local tool="$1" manager="$2"
 	local -a inst_versions=()
 	case "$manager" in
-	fnm|sdkman|chruby|corepack)
+	mise)
 		if command -v mise &>/dev/null; then
 			readarray -t inst_versions < <(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | sed 's/^zulu-//' || true)
 		fi
@@ -200,7 +202,7 @@ uninstall_managed_version() {
 
 	for v in "${selected_vers[@]}"; do
 		case "$manager" in
-		fnm|sdkman|chruby|corepack)
+		mise)
 			local mise_ver="$v"
 			if [[ "$tool" == "java" ]]; then
 				mise_ver="zulu-$v"
@@ -263,7 +265,7 @@ process_tool() {
 			local mgr
 			mgr=$(c_get "$tool" "manager")
 			case "$mgr" in
-			fnm|sdkman|chruby|corepack)
+			mise)
 				run_step "Removendo" "$tool" "versões do ${tool^}" "versões do ${tool^}" "removed" mise prune "$tool" || audit_log missing "$tool"
 				;;
 			xcodes)
@@ -479,7 +481,7 @@ remove_untracked_versions() {
 		mgr=$(c_get "$tool" "manager")
 		readarray -t wv < <(c_get_versions "$tool")
 		case "$mgr" in
-		fnm|sdkman|chruby|corepack)
+		mise)
 			readarray -t inst < <(
 				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | sed 's/^zulu-//' || true
 			)
@@ -500,7 +502,7 @@ remove_untracked_versions() {
 			done
 			if [[ "$keep" == "false" && -n "${iv:-}" ]]; then
 				case "$mgr" in
-				fnm|sdkman|chruby|corepack)
+				mise)
 					local mise_ver="$iv"
 					[[ "$tool" == "java" ]] && mise_ver="zulu-$iv"
 					run_bg "RM ${tool^}" "$iv" mise uninstall "$tool@$mise_ver" || true

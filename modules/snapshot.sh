@@ -13,7 +13,7 @@ snapshot_export() {
 			local mgr
 			mgr=$(c_get "$t" "manager")
 			case "$mgr" in
-			fnm|sdkman|chruby|corepack)
+			mise)
 				if command -v mise &>/dev/null; then
 					local mise_ver
 					mise_ver=$(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' | head -1 || true)

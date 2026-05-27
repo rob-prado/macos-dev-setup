@@ -59,7 +59,7 @@ is_tool_version_installed() {
 		local mgr
 		mgr=$(c_get "$tool" "manager")
 		case "$mgr" in
-		fnm|sdkman|chruby|corepack)
+		mise)
 			if command -v mise &>/dev/null; then
 				local mise_ver="$ver"
 				[[ "$tool" == "java" ]] && mise_ver="zulu-$ver"

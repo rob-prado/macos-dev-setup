@@ -45,7 +45,7 @@ readonly DRY_RUN="${DRY_RUN:-0}"
 IFS=$' 
 \t'
 TERM_WIDTH="$(tput cols 2>/dev/null || echo 80)"
-readonly CATALOG_SCHEMA_VERSION=2
+readonly CATALOG_SCHEMA_VERSION=3
 
 HAS_GUM=false
 command -v gum >/dev/null 2>&1 && HAS_GUM=true
