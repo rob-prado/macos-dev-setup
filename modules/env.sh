@@ -77,9 +77,9 @@ EOF
 pf_reconcile_order() {
 	[[ -f "$ENV_FILE" ]] || return 0
 
-	local android_home="" sdkman_dir="" java_home="" default_ruby=""
+	local android_home=""
 	local -a misc_lines=()
-	local in_sudo=false in_sdkman_silencer=false
+	local in_sudo=false
 
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		line="${line%$'\n'}"
@@ -96,36 +96,13 @@ pf_reconcile_order() {
 			continue
 		fi
 
-		if [[ "$line" == "if declare -f sdkman_auto_env"* || "$line" == "# Custom silent SDKMAN auto-env implementation"* ]]; then
-			in_sdkman_silencer=true
-			continue
-		fi
-		if [[ "$in_sdkman_silencer" == "true" ]]; then
-			if [[ "$line" == "fi"* && "$line" == "fi" || "$line" == "# End custom silent SDKMAN auto-env implementation"* ]]; then
-				in_sdkman_silencer=false
-			fi
-			continue
-		fi
-
 		if [[ "$line" == *"if [[ -d \"/opt/homebrew/bin\""* || "$line" == *"export PATH=\"/opt/homebrew/bin"* || "$line" == "fi" || "$line" == "# Custom sudo wrapper"* ]]; then
 			continue
 		fi
 
 		if [[ "$line" == "export ANDROID_HOME="* ]]; then
 			android_home=$(echo "$line" | sed -E 's/^export ANDROID_HOME="?([^"]*)"?/\1/')
-		elif [[ "$line" == "export SDKMAN_DIR="* ]]; then
-			sdkman_dir=$(echo "$line" | sed -E 's/^export SDKMAN_DIR="?([^"]*)"?/\1/')
-		elif [[ "$line" == "export JAVA_HOME="* ]]; then
-			java_home=$(echo "$line" | sed -E 's/^export JAVA_HOME="?([^"]*)"?/\1/')
-		elif [[ "$line" == "chruby ruby-"* ]]; then
-			default_ruby="$line"
-		elif [[ "$line" == "source "* && "$line" == *"chruby.sh" ]]; then
-			continue
-		elif [[ "$line" == "source "* && "$line" == *"auto.sh" ]]; then
-			continue
-		elif [[ "$line" == *"sdkman-init.sh"* ]]; then
-			continue
-		elif [[ "$line" == *"fnm env"* ]]; then
+		elif [[ "$line" == *"mise activate"* ]]; then
 			continue
 		elif [[ "$line" == "export PATH="* && "$line" == *"\$ANDROID_HOME"* ]]; then
 			continue
@@ -134,13 +111,7 @@ pf_reconcile_order() {
 		fi
 	done <"$ENV_FILE"
 
-	[[ -z "$sdkman_dir" ]] && sdkman_dir="\$HOME/.sdkman"
-	[[ -z "$java_home" ]] && java_home="\$HOME/.sdkman/candidates/java/current"
 	[[ -z "$android_home" && -d "$HOME/Library/Android/Sdk" ]] && android_home="\$HOME/Library/Android/Sdk"
-
-	if [[ -f "$HOME/.sdkman/etc/config" ]]; then
-		sed -i '' 's/sdkman_auto_env=true/sdkman_auto_env=false/g' "$HOME/.sdkman/etc/config" 2>/dev/null || true
-	fi
 
 	local tmp
 	tmp=$(mktemp)
@@ -178,44 +149,18 @@ EOF
 
 	echo "" >>"$tmp"
 	[[ -n "$android_home" ]] && echo "export ANDROID_HOME=\"$android_home\"" >>"$tmp"
-	echo "export SDKMAN_DIR=\"$sdkman_dir\"" >>"$tmp"
-	echo "export JAVA_HOME=\"$java_home\"" >>"$tmp"
-
-	echo "" >>"$tmp"
-	echo "source $BREW_PREFIX/opt/chruby/share/chruby/chruby.sh" >>"$tmp"
-	echo "source $BREW_PREFIX/opt/chruby/share/chruby/auto.sh" >>"$tmp"
-	echo "[[ -s \"\$SDKMAN_DIR/bin/sdkman-init.sh\" ]] && source \"\$SDKMAN_DIR/bin/sdkman-init.sh\" >/dev/null" >>"$tmp"
 	cat <<'EOF' >>"$tmp"
-# Custom silent SDKMAN auto-env implementation
-sdkman_auto_env() {
-	if [[ -n $SDKMAN_ENV ]] && [[ ! $PWD =~ ^$SDKMAN_ENV ]]; then
-		sdk env clear >/dev/null 2>&1
-	fi
-	if [[ -f .sdkmanrc ]]; then
-		sdk env >/dev/null 2>&1
-	fi
-}
-
-if [[ -n "$ZSH_VERSION" ]]; then
-	if [[ ! " ${chpwd_functions[@]} " =~ " sdkman_auto_env " ]]; then
-		chpwd_functions+=(sdkman_auto_env)
-	fi
-elif [[ -n "$BASH_VERSION" ]]; then
-	if [[ ! "$PROMPT_COMMAND" =~ "sdkman_auto_env" ]]; then
-		trimmed_prompt_command="${PROMPT_COMMAND%"${PROMPT_COMMAND##*[![:space:]]}"}"
-		[[ -z "$trimmed_prompt_command" ]] && PROMPT_COMMAND="sdkman_auto_env" || PROMPT_COMMAND="${trimmed_prompt_command%\;};sdkman_auto_env"
-	fi
+if command -v mise &>/dev/null; then
+  if [[ -n "$ZSH_VERSION" ]]; then
+    eval "$(mise activate zsh)"
+  elif [[ -n "$BASH_VERSION" ]]; then
+    eval "$(mise activate bash)"
+  fi
 fi
-
-# Run once at startup silently
-sdkman_auto_env
-# End custom silent SDKMAN auto-env implementation
 EOF
-	echo "if command -v fnm &>/dev/null; then eval \"\$(fnm env --use-on-cd --log-level=quiet)\"; fi" >>"$tmp"
 
 	echo "" >>"$tmp"
 	echo "export PATH=\"\$ANDROID_HOME/emulator:\$ANDROID_HOME/platform-tools:\$PATH\"" >>"$tmp"
-	[[ -n "$default_ruby" ]] && echo "$default_ruby" >>"$tmp"
 
 	if [[ ${#misc_lines[@]} -gt 0 ]]; then
 		echo "" >>"$tmp"

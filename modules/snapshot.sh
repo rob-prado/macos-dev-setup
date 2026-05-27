@@ -13,20 +13,17 @@ snapshot_export() {
 			local mgr
 			mgr=$(c_get "$t" "manager")
 			case "$mgr" in
-			fnm)
-				resolved=$(fnm default 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
-				;;
-			sdkman)
-				resolved=$(readlink "$SDKMAN_DIR/candidates/java/current" 2>/dev/null | xargs basename 2>/dev/null || true)
-				;;
-			chruby)
-				resolved=$(grep -oE 'chruby ruby-[0-9.]+' "$ENV_FILE" 2>/dev/null | sed 's/chruby ruby-//' || true)
-				;;
-			corepack)
-				resolved=$(yarn -v 2>/dev/null || true)
+			fnm|sdkman|chruby|corepack)
+				if command -v mise &>/dev/null; then
+					local mise_ver
+					mise_ver=$(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' | head -1 || true)
+					[[ -n "$mise_ver" ]] && resolved="$mise_ver"
+				fi
 				;;
 			xcodes)
-				resolved=$(xcodebuild -version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || true)
+				if command -v xcodes &>/dev/null; then
+					resolved=$(xcodes installed 2>/dev/null | awk '{print $1}' | head -1 || true)
+				fi
 				;;
 			esac
 		elif [[ "$type" == "gem" ]]; then

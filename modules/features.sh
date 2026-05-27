@@ -11,28 +11,10 @@ install_managed() {
 	brew list "$tool" &>/dev/null && run_bg "Limpando" "$tool" brew uninstall --force "$tool" || true
 
 	case "$manager" in
-	fnm)
-		command -v fnm &>/dev/null || retry 3 brew install fnm
-		pf_rm_pat "fnm env"
-		pf_add "if command -v fnm &>/dev/null; then eval \"\$(fnm env --use-on-cd --log-level=quiet)\"; fi"
-		eval "$(fnm env)" || true
-		;;
-	sdkman)
-		[[ -d "$SDKMAN_DIR" ]] || retry 3 "$BREW_BASH" -c "curl -sL 'https://get.sdkman.io?rcupdate=false' | '$BREW_BASH'"
-		sed -i '' 's/sdkman_auto_answer=false/sdkman_auto_answer=true/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
-		sed -i '' 's/sdkman_auto_env=true/sdkman_auto_env=false/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
-		pf_set_env "SDKMAN_DIR" "\$HOME/.sdkman"
-		pf_add "[[ -s \"\$SDKMAN_DIR/bin/sdkman-init.sh\" ]] && source \"\$SDKMAN_DIR/bin/sdkman-init.sh\""
-		pf_set_env "JAVA_HOME" "\$HOME/.sdkman/candidates/java/current"
-		;;
-	chruby)
-		command -v chruby-exec &>/dev/null || retry 3 brew install chruby ruby-install
-		pf_add "source $BREW_PREFIX/opt/chruby/share/chruby/chruby.sh"
-		pf_add "source $BREW_PREFIX/opt/chruby/share/chruby/auto.sh"
-		;;
-	corepack)
-		command -v corepack &>/dev/null || retry 3 npm install -g corepack@latest
-		corepack enable &>/dev/null || true
+	fnm|sdkman|chruby|corepack)
+		command -v mise &>/dev/null || retry 3 brew install mise
+		grep -q 'mise activate' "$ENV_FILE" 2>/dev/null || \
+			pf_add "eval \"\$(mise activate \${SHELL##*/})\""
 		;;
 	xcodes) command -v xcodes &>/dev/null || retry 3 brew install xcodes ;;
 	esac
@@ -58,11 +40,14 @@ install_managed() {
 	if [[ "$fetch_latest" == "true" ]]; then
 		local lv=""
 		case "$manager" in
-		fnm) lv=$(fnm ls-remote --lts 2>/dev/null | tail -1 | awk '{print $1}' | sed 's/v//' || echo "") ;;
-		sdkman) lv=$("$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null && sdk list java 2>/dev/null | grep -i 'zulu' | grep -vE '(ea|fx)' | awk '{print \$NF}' | sort -V | tail -1 | grep -oE '^[0-9]+'" 2>/dev/null || echo "") ;;
-		chruby) lv=$(safe_curl -sL "https://raw.githubusercontent.com/postmodern/ruby-versions/master/ruby/versions.txt" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 2>/dev/null || echo "3.3.1") ;;
-		corepack) lv=$(safe_curl -sf "https://repo.yarnpkg.com/tags" | jq -r '.latest.stable // empty' 2>/dev/null | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+$' 2>/dev/null || echo "") ;;
-		xcodes) lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | awk '{print $1}' 2>/dev/null || echo "") ;;
+		fnm|sdkman|chruby|corepack)
+			local mise_ver="$v"
+			[[ "$tool" == "java" ]] && mise_ver="zulu-$v"
+			run_step "Removendo" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
+			;;
+		xcodes)
+			run_step "Removendo" "Xcode $v" "Xcode $v" "Xcode $v" "removed" sudo xcodes uninstall "$v"
+			;;
 		esac
 		if [[ -n "${lv:-}" && "$lv" != "null" ]]; then
 			versions+=("$lv")
@@ -79,109 +64,30 @@ install_managed() {
 	fi
 
 	case "$manager" in
-	fnm)
+	fnm|sdkman|chruby|corepack)
 		for v in "${uv[@]}"; do
-			local iv success=false
-			iv=$(fnm list 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | grep -E "^v?${v}" | head -1 || true)
-			if [[ -n "${iv:-}" ]]; then
-				printf '\r%s✓ Node %s ok%s\n' "${C_D}" "$iv" "${C_RESET}"
+			local success=false iv
+			local mise_ver="$v"
+			[[ "$tool" == "java" ]] && mise_ver="zulu-$v"
+			
+			iv=$(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && $2=="'"$mise_ver"'"{print $2}' || true)
+			if [[ -n "$iv" ]]; then
+				printf '%s✓ %s %s ok%s
+' "${C_D}" "${tool^}" "$v" "${C_RESET}"
 				if [[ "$mode" == "update" ]]; then
-					audit_log uptodate "Node $iv"
+					audit_log uptodate "${tool^} $v"
 				else
-					audit_log skipped "Node $iv"
+					audit_log skipped "${tool^} $v"
 				fi
 				success=true
 			else
-				if run_step "Instalando" "Node $v" "Node $v" "Node $v" "installed" fnm install "$v"; then
+				if run_step "Instalando" "${tool^} $v" "${tool^} $v" "${tool^} $v" "installed" mise install -y "$tool@$mise_ver"; then
 					success=true
 				fi
 			fi
 			if [[ "$success" == "true" ]]; then
-				fnm default "$v" &>/dev/null || true
-				register_tool_state "$tool" "$v" "installed"
-			fi
-		done
-		;;
-	sdkman)
-		for v in "${uv[@]}"; do
-			local ex success=false
-			ex=$("$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk list java 2>/dev/null | grep -i 'zulu' | grep -vE '(ea|fx)' | awk '{print \$NF}' | grep -E '^${v}(\.|$)' | sort -V | tail -1" || true)
-			if [[ -z "${ex:-}" ]]; then
-				ex=$("$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk list java 2>/dev/null | grep -vE '(ea|fx)' | awk '{print \$NF}' | grep -E '^${v}(\.|$)' | sort -V | tail -1" 2>/dev/null || echo "")
-			fi
-
-			if [[ -n "${ex:-}" ]]; then
-				if [[ -d "$SDKMAN_DIR/candidates/java/$ex" ]]; then
-					printf '\r%s✓ Java %s ok%s\n' "${C_D}" "$ex" "${C_RESET}"
-					if [[ "$mode" == "update" ]]; then
-						audit_log uptodate "Java $ex"
-					else
-						audit_log skipped "Java $ex"
-					fi
-					success=true
-				else
-					if run_step "Instalando" "Java $v" "Java $ex" "Java $ex" "installed" "$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk install java '$ex'"; then
-						success=true
-					fi
-				fi
-				if [[ "$success" == "true" ]]; then
-					"$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk default java '$ex' &>/dev/null" || true
-					c_add_version "$tool" "$v"
-					update_lock_entry "$tool" "$ex" "installed"
-				fi
-			else
-				warn "Versão $v de Java não foi encontrada no catálogo do SDKMAN."
-				audit_log failed "Java $v (não encontrada)"
-			fi
-		done
-		;;
-	chruby)
-		for v in "${uv[@]}"; do
-			local success=false
-			if [[ ! -x "$HOME/.rubies/ruby-$v/bin/ruby" ]]; then
-				if run_step "Instalando" "Ruby $v" "Ruby $v" "Ruby $v" "installed" "$BREW_BASH" -c "set +u; rm -rf \"\$HOME/src/ruby-\$v\"*; [[ -f '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh' ]] && source '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh'; ruby-install ruby '$v'"; then
-					success=true
-				fi
-			else
-				printf '\r%s✓ Ruby %s ok%s\n' "${C_D}" "$v" "${C_RESET}"
-				if [[ "$mode" == "update" ]]; then
-					audit_log uptodate "Ruby $v"
-				else
-					audit_log skipped "Ruby $v"
-				fi
-				success=true
-			fi
-			if [[ "$success" == "true" ]]; then
-				register_tool_state "$tool" "$v" "installed"
-				pf_rm_pat "chruby ruby-"
-				pf_add "chruby ruby-$v &>/dev/null || true"
-			fi
-		done
-		;;
-	corepack)
-		for v in "${uv[@]}"; do
-			local cy success=false
-			cy=$(yarn -v 2>/dev/null || true)
-			if [[ "${cy:-}" == "$v" ]]; then
-				printf '\r%s✓ Yarn %s ok%s\n' "${C_D}" "$v" "${C_RESET}"
-				if [[ "$mode" == "update" ]]; then
-					audit_log uptodate "Yarn $v"
-				else
-					audit_log skipped "Yarn $v"
-				fi
-				register_tool_state "$tool" "$v" "installed"
-				continue
-			fi
-			if [[ "${v:0:1}" == "1" ]]; then
-				if run_step "Instalando" "Yarn $v" "Yarn $v" "Yarn $v" "installed" npm install -g "yarn@$v"; then
-					success=true
-				fi
-			else
-				if run_step "Instalando" "Yarn $v" "Yarn $v" "Yarn $v" "installed" corepack prepare "yarn@$v" --activate; then
-					success=true
-				fi
-			fi
-			if [[ "$success" == "true" ]]; then
+				mise use -g "$tool@$mise_ver" >/dev/null 2>&1 || true
+				[[ "$tool" == "java" ]] && c_add_version "$tool" "$v"
 				register_tool_state "$tool" "$v" "installed"
 			fi
 		done
@@ -191,7 +97,8 @@ install_managed() {
 			local ins success=false
 			ins=$(xcodes installed 2>/dev/null | grep -E "^$v" || true)
 			if [[ -n "${ins:-}" ]]; then
-				printf '\r%s✓ Xcode %s ok%s\n' "${C_D}" "$v" "${C_RESET}"
+				printf '%s✓ Xcode %s ok%s
+' "${C_D}" "$v" "${C_RESET}"
 				run_bg "Select" "Xcode $v" sudo xcodes select "$v" &>/dev/null || true
 				if [[ "$mode" == "update" ]]; then
 					audit_log uptodate "Xcode $v"
@@ -201,10 +108,14 @@ install_managed() {
 				success=true
 			else
 				msg "$C_Y" "⚠️ Xcode $v requer Apple ID (senha + 2FA)"
-				printf '  %b📲 A instalação será interativa — insira suas credenciais Apple quando solicitado.%b\n\n' "$C_W" "$C_RESET"
+				printf '  %b📲 A instalação será interativa — insira suas credenciais Apple quando solicitado.%b
+
+' "$C_W" "$C_RESET"
 				if [[ "$DRY_RUN" == "1" ]]; then
-					printf '+ xcodes install %q --experimental-unxip --no-superuser\n' "$v"
-					printf '+ sudo xcode-select -s /Applications/Xcode*.app/Contents/Developer\n'
+					printf '+ xcodes install %q --experimental-unxip --no-superuser
+' "$v"
+					printf '+ sudo xcode-select -s /Applications/Xcode*.app/Contents/Developer
+'
 					success=true
 				else
 					if xcodes install "$v" --experimental-unxip --no-superuser \
@@ -228,28 +139,15 @@ uninstall_managed_version() {
 	local tool="$1" manager="$2"
 	local -a inst_versions=()
 	case "$manager" in
-	fnm)
-		if command -v fnm &>/dev/null; then
-			readarray -t inst_versions < <(fnm list 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
-		fi
-		;;
-	sdkman)
-		if [[ -d "$SDKMAN_DIR/candidates/java" ]]; then
-			readarray -t inst_versions < <(ls -1 "$SDKMAN_DIR/candidates/java" 2>/dev/null || true)
-		fi
-		;;
-	chruby)
-		if [[ -d "$HOME/.rubies" ]]; then
-			readarray -t inst_versions < <(ls -1 "$HOME/.rubies" | sed 's/ruby-//' 2>/dev/null || true)
+	fnm|sdkman|chruby|corepack)
+		if command -v mise &>/dev/null; then
+			readarray -t inst_versions < <(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | sed 's/^zulu-//' || true)
 		fi
 		;;
 	xcodes)
 		if command -v xcodes &>/dev/null; then
 			readarray -t inst_versions < <(xcodes installed 2>/dev/null | awk '{print $1}' || true)
 		fi
-		;;
-	corepack)
-		readarray -t inst_versions < <(c_get_versions "$tool")
 		;;
 	esac
 
@@ -297,20 +195,13 @@ uninstall_managed_version() {
 
 	for v in "${selected_vers[@]}"; do
 		case "$manager" in
-		fnm)
-			run_step "Removendo" "Node $v" "Node $v" "Node $v" "removed" fnm uninstall "$v"
-			;;
-		sdkman)
-			run_step "Removendo" "Java $v" "Java $v" "Java $v" "removed" "$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk uninstall java '$v'"
-			;;
-		chruby)
-			run_step "Removendo" "Ruby $v" "Ruby $v" "Ruby $v" "removed" rm -rf "$HOME/.rubies/ruby-$v"
+		fnm|sdkman|chruby|corepack)
+			local mise_ver="$v"
+			[[ "$tool" == "java" ]] && mise_ver="zulu-$v"
+			run_step "Removendo" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
 			;;
 		xcodes)
 			run_step "Removendo" "Xcode $v" "Xcode $v" "Xcode $v" "removed" sudo xcodes uninstall "$v"
-			;;
-		corepack)
-			run_step "Removendo" "Yarn $v" "Yarn $v" "Yarn $v" "removed" corepack disable "$tool"
 			;;
 		esac
 
@@ -362,14 +253,8 @@ process_tool() {
 			local mgr
 			mgr=$(c_get "$tool" "manager")
 			case "$mgr" in
-			sdkman)
-				run_step "Removendo" "$tool" "versões do Java" "versões do Java" "removed" rm -rf "$SDKMAN_DIR/candidates/java" || audit_log missing "$tool"
-				;;
-			fnm)
-				run_step "Removendo" "$tool" "versões do Node" "versões do Node" "removed" rm -rf "$HOME/.local/share/fnm/node-versions" "$HOME/.local/share/fnm/aliases" || audit_log missing "$tool"
-				;;
-			chruby)
-				run_step "Removendo" "$tool" "versões do Ruby" "versões do Ruby" "removed" rm -rf "$HOME/.rubies" || audit_log missing "$tool"
+			fnm|sdkman|chruby|corepack)
+				run_step "Removendo" "$tool" "versões do ${tool^}" "versões do ${tool^}" "removed" mise prune "$tool" || audit_log missing "$tool"
 				;;
 			xcodes)
 				local -a x_vers=()
@@ -381,9 +266,6 @@ process_tool() {
 						fi
 					done
 				fi
-				;;
-			corepack)
-				run_step "Removendo" "$tool" "Yarn" "Yarn" "removed" rm -rf "$HOME/.yarn" "$HOME/.config/yarn" || audit_log missing "$tool"
 				;;
 			*)
 				run_step "Removendo" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$mgr" || audit_log missing "$tool"
@@ -587,45 +469,14 @@ remove_untracked_versions() {
 		mgr=$(c_get "$tool" "manager")
 		readarray -t wv < <(c_get_versions "$tool")
 		case "$mgr" in
-		fnm)
+		fnm|sdkman|chruby|corepack)
 			readarray -t inst < <(
-				fnm list 2>/dev/null |
-					grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' |
-					sed 's/^v//' || true
-			)
-			;;
-		sdkman)
-			readarray -t inst < <(
-				find "$SDKMAN_DIR/candidates/java" \
-					-mindepth 1 \
-					-maxdepth 1 \
-					-type d \
-					! -name 'current' \
-					-exec basename {} \; 2>/dev/null || true
-			)
-			;;
-		chruby)
-			readarray -t inst < <(
-				find "$HOME/.rubies" \
-					-mindepth 1 \
-					-maxdepth 1 \
-					-type d \
-					-name 'ruby-*' \
-					-exec basename {} \; 2>/dev/null |
-					sed 's/ruby-//' || true
+				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | sed 's/^zulu-//' || true
 			)
 			;;
 		xcodes)
 			readarray -t inst < <(
-				xcodes installed 2>/dev/null |
-					awk '{print $1}' || true
-			)
-			;;
-		corepack)
-			readarray -t inst < <(
-				npm ls -g yarn 2>/dev/null |
-					grep -oE 'yarn@[0-9]+\.[0-9]+\.[0-9]+' |
-					sed 's/yarn@//' || true
+				xcodes installed 2>/dev/null | awk '{print $1}' || true
 			)
 			;;
 		esac
@@ -639,34 +490,13 @@ remove_untracked_versions() {
 			done
 			if [[ "$keep" == "false" && -n "${iv:-}" ]]; then
 				case "$mgr" in
-				fnm)
-					run_bg "RM Node" "$iv" fnm uninstall "$iv" || true
-					;;
-				sdkman)
-					run_bg \
-						"RM Java" \
-						"$iv" \
-						"$BREW_BASH" \
-						-c "
-                                set +u
-                                [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] &&
-                                source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null
-                                sdk uninstall java '$iv'
-                            " || true
-					;;
-				chruby)
-					run_bg \
-						"RM Ruby" \
-						"$iv" \
-						rm -rf "$HOME/.rubies/ruby-$iv" "$HOME/src/ruby-$iv"* || true
+				fnm|sdkman|chruby|corepack)
+					local mise_ver="$iv"
+					[[ "$tool" == "java" ]] && mise_ver="zulu-$iv"
+					run_bg "RM ${tool^}" "$iv" mise uninstall "$tool@$mise_ver" || true
 					;;
 				xcodes)
 					run_bg "RM Xcode" "$iv" xcodes uninstall "$iv" || true
-					;;
-				corepack)
-					if [[ "${iv%%.*}" == "1" ]]; then
-						run_bg "RM Yarn" "$iv" npm uninstall -g "yarn" || true
-					fi
 					;;
 				esac
 				update_lock_entry "$tool" "" "removed"

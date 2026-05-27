@@ -32,7 +32,6 @@ fi
 BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
 readonly BREW_PREFIX
 readonly BREW_BASH="$BREW_PREFIX/bin/bash"
-readonly SDKMAN_DIR="$HOME/.sdkman"
 readonly DEFAULT_CATALOG="$HOME/.mac-dev-catalog.json"
 CATALOG_FILE="${MAC_DEV_CATALOG_FILE:-$DEFAULT_CATALOG}"
 readonly LOCK_FILE="${CATALOG_FILE%.json}.lock"

@@ -59,29 +59,16 @@ is_tool_version_installed() {
 		local mgr
 		mgr=$(c_get "$tool" "manager")
 		case "$mgr" in
-		fnm)
-			if command -v fnm &>/dev/null; then
-				fnm list 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | grep -qE "^$ver(\.|$)" && return 0
-			fi
-			;;
-		sdkman)
-			if [[ -d "$SDKMAN_DIR/candidates/java" ]]; then
-				ls -1 "$SDKMAN_DIR/candidates/java" 2>/dev/null | grep -qE "^$ver(\.|-|$)" && return 0
-			fi
-			;;
-		chruby)
-			if [[ -d "$HOME/.rubies" ]]; then
-				ls -1 "$HOME/.rubies" 2>/dev/null | sed 's/ruby-//' | grep -qE "^$ver(\.|$)" && return 0
+		fnm|sdkman|chruby|corepack)
+			if command -v mise &>/dev/null; then
+				local mise_ver="$ver"
+				[[ "$tool" == "java" ]] && mise_ver="zulu-$ver"
+				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | grep -qE "^$mise_ver(\.|$)" && return 0
 			fi
 			;;
 		xcodes)
 			if command -v xcodes &>/dev/null; then
 				xcodes installed 2>/dev/null | awk '{print $1}' | grep -qE "^$ver(\.|$)" && return 0
-			fi
-			;;
-		corepack)
-			if command -v yarn &>/dev/null; then
-				yarn -v 2>/dev/null | grep -qE "^$ver(\.|$)" && return 0
 			fi
 			;;
 		esac
@@ -117,43 +104,25 @@ ensure_project_version_files() {
 
 	if [[ -n "$java_v" ]]; then
 		local current_jv=""
-		[[ -f ".sdkmanrc" ]] && current_jv=$(grep 'java=' .sdkmanrc 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || true)
+		[[ -f ".java-version" ]] && current_jv=$(cat .java-version 2>/dev/null | tr -d '[:space:]' || true)
 
 		local resolved_java="$java_v"
-		if [[ ! "$java_v" == *-* ]]; then
-			local local_ex=""
-			if [[ -d "$SDKMAN_DIR/candidates/java" ]]; then
-				local_ex=$(ls -1 "$SDKMAN_DIR/candidates/java" 2>/dev/null | grep -E "^${java_v}(\.|$)" | grep -v 'current' | sort -V | tail -1 || echo "")
-			fi
-			if [[ -n "$local_ex" ]]; then
-				resolved_java="$local_ex"
-			else
-				local ex
-				ex=$("$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk list java 2>/dev/null | grep -i 'zulu' | grep -vE '(ea|fx)' | awk '{print \$NF}' | grep -E '^${java_v}(\.|$)' | sort -V | tail -1" || true)
-				if [[ -n "$ex" ]]; then
-					resolved_java="$ex"
-				fi
-			fi
-		fi
-
-		if [[ ! -f ".sdkmanrc" ]]; then
+		# Com mise, deixamos ele instalar e usar a versão passada
+		
+		if [[ ! -f ".java-version" ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
-				printf 'java=%s\n' "$resolved_java" >".sdkmanrc"
+				printf '%s
+' "$resolved_java" >".java-version"
 			fi
-			msg "$C_G" "📝 .sdkmanrc → java=$resolved_java"
+			msg "$C_G" "📝 .java-version → $resolved_java"
 			any_created=true
-		elif [[ "$current_jv" != "$resolved_java" && ("$current_jv" == "$java_v" || ! "$current_jv" == *-*) ]]; then
+		elif [[ "$current_jv" != "$resolved_java" ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
-				sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
+				printf '%s
+' "$resolved_java" >".java-version"
 			fi
-			msg "$C_G" "📝 .sdkmanrc → java=$resolved_java (atualizado de $current_jv)"
+			msg "$C_G" "📝 .java-version → $resolved_java (atualizado de $current_jv)"
 			any_created=true
-		fi
-		if [[ -f "$SDKMAN_DIR/etc/config" ]]; then
-			if [[ "$DRY_RUN" != "1" ]]; then
-				grep -q 'sdkman_auto_env=true' "$SDKMAN_DIR/etc/config" 2>/dev/null ||
-					sed -i '' 's/sdkman_auto_env=false/sdkman_auto_env=true/g' "$SDKMAN_DIR/etc/config" 2>/dev/null || true
-			fi
 		fi
 	fi
 
@@ -162,7 +131,7 @@ ensure_project_version_files() {
 
 print_version_activation_hint() {
 	printf '\n  %b💡 Para ativar as versões do projeto neste shell:%b\n' "$C_Y" "$C_RESET"
-	printf '     %bcd .%b  %b# dispara auto-switch do fnm, chruby e sdkman%b\n\n' "$C_BOLD$C_W" "$C_RESET" "$C_D" "$C_RESET"
+	printf '     %bcd .%b  %b# dispara auto-switch do mise%b\n\n' "$C_BOLD$C_W" "$C_RESET" "$C_D" "$C_RESET"
 }
 
 ensure_corepack_project_yarn() {
@@ -198,7 +167,7 @@ ensure_corepack_project_yarn() {
 
 is_inside_project() {
 	[[ "$PWD" == "$HOME" || "$PWD" == "/" ]] && return 1
-	if [[ -f "package.json" || -f ".nvmrc" || -f ".node-version" || -f ".ruby-version" || -f ".sdkmanrc" || -f "Gemfile" || -d "android" || -d "ios" || -f "ReactotronConfig.js" || -f "reactotron.config.js" ]]; then
+	if [[ -f "package.json" || -f ".nvmrc" || -f ".node-version" || -f ".ruby-version" || -f ".java-version" || -f ".sdkmanrc" || -f "Gemfile" || -d "android" || -d "ios" || -f "ReactotronConfig.js" || -f "reactotron.config.js" ]]; then
 		return 0
 	fi
 	return 1
@@ -223,7 +192,7 @@ detect_project_tools() {
 
 	[[ -f ".nvmrc" ]] && detected+=("node")
 	[[ -f ".ruby-version" ]] && detected+=("ruby")
-	[[ -f ".sdkmanrc" ]] && detected+=("java")
+	[[ -f ".java-version" || -f ".sdkmanrc" ]] && detected+=("java")
 
 	if [[ -f "yarn.lock" || -f ".yarnrc.yml" ]]; then
 		detected+=("yarn")
@@ -316,7 +285,11 @@ sync_project_context() {
 
 	[[ -f ".nvmrc" ]] && detected+=("node:$(grep -oE '[0-9.]+' .nvmrc | head -1 || echo "")")
 	[[ -f ".ruby-version" ]] && detected+=("ruby:$(sed -E 's/^ruby-//;s/[[:space:]]//g' .ruby-version || echo "")")
-	[[ -f ".sdkmanrc" ]] && detected+=("java:$(grep 'java=' .sdkmanrc | cut -d= -f2 | tr -d '[:space:]' || echo "")")
+	if [[ -f ".java-version" ]]; then
+		detected+=("java:$(cat .java-version | tr -d '[:space:]' || echo "")")
+	elif [[ -f ".sdkmanrc" ]]; then
+		detected+=("java:$(grep 'java=' .sdkmanrc | cut -d= -f2 | tr -d '[:space:]' || echo "")")
+	fi
 
 	if [[ -f "yarn.lock" || -f ".yarnrc.yml" ]]; then
 		local has_yarn=false
@@ -471,33 +444,17 @@ sync_project_context() {
 
 	if [[ -n "${max_versions[java]:-}" ]]; then
 		local max_java="${max_versions[java]}"
-		if [[ -f ".sdkmanrc" ]]; then
-			local sdk_v
-			sdk_v=$(grep 'java=' .sdkmanrc 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || echo "")
-			local sdk_major max_java_major
-			sdk_major=$(echo "$sdk_v" | grep -oE '^[0-9]+' || echo "")
+		if [[ -f ".java-version" ]]; then
+			local jv_v
+			jv_v=$(cat .java-version 2>/dev/null | tr -d '[:space:]' || echo "")
+			local jv_major max_java_major
+			jv_major=$(echo "$jv_v" | grep -oE '^[0-9]+' || echo "")
 			max_java_major=$(echo "$max_java" | grep -oE '^[0-9]+' || echo "")
-			if is_smaller_version "$sdk_major" "$max_java_major" || [[ ! "$sdk_v" == *-* ]]; then
-				local resolved_java="$max_java"
-				if [[ ! "$max_java" == *-* ]]; then
-					local local_ex=""
-					if [[ -d "$SDKMAN_DIR/candidates/java" ]]; then
-						local_ex=$(ls -1 "$SDKMAN_DIR/candidates/java" 2>/dev/null | grep -E "^${max_java}(\.|$)" | grep -v 'current' | sort -V | tail -1 || echo "")
-					fi
-					if [[ -n "$local_ex" ]]; then
-						resolved_java="$local_ex"
-					else
-						local ex
-						ex=$("$BREW_BASH" -c "set +u; [[ -f '$SDKMAN_DIR/bin/sdkman-init.sh' ]] && source '$SDKMAN_DIR/bin/sdkman-init.sh' >/dev/null; sdk list java 2>/dev/null | grep -i 'zulu' | grep -vE '(ea|fx)' | awk '{print \$NF}' | grep -E '^${max_java}(\.|$)' | sort -V | tail -1" || true)
-						if [[ -n "$ex" ]]; then
-							resolved_java="$ex"
-						fi
-					fi
-				fi
+			if is_smaller_version "$jv_major" "$max_java_major"; then
 				if [[ "$DRY_RUN" != "1" ]]; then
-					sed -i '' "s/java=.*/java=$resolved_java/g" .sdkmanrc 2>/dev/null || true
+					echo "$max_java" >".java-version"
 				fi
-				msg "$C_G" "📝 .sdkmanrc → java=$resolved_java (atualizado de $sdk_v)"
+				msg "$C_G" "📝 .java-version → $max_java (atualizado de $jv_v)"
 			fi
 		fi
 		if [[ -f "package.json" ]]; then

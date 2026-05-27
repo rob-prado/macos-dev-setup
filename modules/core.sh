@@ -76,24 +76,15 @@ run_bg_capture() {
 get_remote_versions() {
 	local tool="$1" manager="$2"
 	case "$manager" in
-	fnm)
-		fnm ls-remote 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -Vru
-		;;
-	sdkman)
-		(
-			set +u
-			[[ -f "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh" >/dev/null
-			sdk list java 2>/dev/null | grep -E '^[[:space:]]*[[:alnum:] .]*\|' | awk -F '|' '{print $6}' | tr -d ' ' | grep -vE '(Identifier|^$)' | sort -Vru || true
-		)
-		;;
-	chruby)
-		safe_curl -sL "https://raw.githubusercontent.com/postmodern/ruby-versions/master/ruby/versions.txt" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -Vru
+	fnm|sdkman|chruby|corepack)
+		if [[ "$tool" == "java" ]]; then
+			mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru || true
+		else
+			mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+' | sort -Vru || true
+		fi
 		;;
 	xcodes)
 		xcodes list 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]' | sort -Vru
-		;;
-	corepack)
-		safe_curl -sf "https://repo.yarnpkg.com/tags" | jq -r '.tags[]' 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -Vru || true
 		;;
 	esac
 }

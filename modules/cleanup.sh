@@ -11,8 +11,6 @@ clean_rn_job() {
 
 clean_install_caches_job() {
 	rm -rf ~/Library/Caches/Homebrew/* \
-		"$SDKMAN_DIR/archives/"* \
-		"$SDKMAN_DIR/tmp/"* \
 		~/src/ruby-* \
 		~/.cache/ruby-install/* \
 		~/Library/Caches/org.xcodes.xcodes/* \
@@ -25,15 +23,13 @@ clean_profiles_job() {
 	pf_rm_pat "JAVA_HOME"
 	pf_rm_pat "fnm"
 	pf_rm_pat "chruby"
-	pf_rm_pat "sdkman"
-	_scrub_profile_file "$(get_target_rc)"
+		_scrub_profile_file "$(get_target_rc)"
 	_scrub_profile_file "$HOME/.profile"
 }
 
 clean_folders_job() {
 	rm -rf ~/.nvm \
 		~/.nodenv \
-		"$SDKMAN_DIR" \
 		~/.rubies \
 		~/.cache/yarn \
 		~/.yarn \

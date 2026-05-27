@@ -141,30 +141,10 @@ catalog_reconcile() {
 			mgr=$(c_get "$t" "manager")
 			local -a vers=()
 			case "$mgr" in
-			fnm)
-				if command -v fnm &>/dev/null; then
+			fnm|sdkman|chruby|corepack)
+				if command -v mise &>/dev/null; then
 					is_installed=true
-					readarray -t vers < <(fnm list 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^v//' || true)
-				fi
-				;;
-			sdkman)
-				if [[ -d "$SDKMAN_DIR/candidates/java" ]]; then
-					is_installed=true
-					readarray -t vers < <(ls -1 "$SDKMAN_DIR/candidates/java" 2>/dev/null | grep -v 'current' || true)
-				fi
-				;;
-			chruby)
-				if [[ -d "$HOME/.rubies" ]]; then
-					is_installed=true
-					readarray -t vers < <(ls -1 "$HOME/.rubies" 2>/dev/null | sed 's/ruby-//' || true)
-				fi
-				;;
-			corepack)
-				local yv
-				yv=$(yarn -v 2>/dev/null || true)
-				if [[ -n "$yv" ]]; then
-					is_installed=true
-					vers=("$yv")
+					readarray -t vers < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' || true)
 				fi
 				;;
 			xcodes)
