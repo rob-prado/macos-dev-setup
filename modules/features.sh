@@ -41,13 +41,13 @@ install_managed() {
 		local lv=""
 		case "$manager" in
 		fnm|sdkman|chruby|corepack)
-			local mise_ver="$v"
-			[[ "$tool" == "java" ]] && mise_ver="zulu-$v"
-			run_step "Removendo" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
+			if [[ "$tool" == "java" ]]; then
+				lv=$(mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru | head -1 || true)
+			else
+				lv=$(mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+' | sort -Vr | head -1 || true)
+			fi
 			;;
-		xcodes)
-			run_step "Removendo" "Xcode $v" "Xcode $v" "Xcode $v" "removed" sudo xcodes uninstall "$v"
-			;;
+		xcodes) lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | awk '{print $1}' 2>/dev/null || echo "") ;;
 		esac
 		if [[ -n "${lv:-}" && "$lv" != "null" ]]; then
 			versions+=("$lv")

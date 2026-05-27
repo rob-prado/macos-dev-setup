@@ -51,7 +51,7 @@ draw_box() {
 	local rp=$((total_pad - lp))
 	printf '\n%s╔%s╗\n║%s%s%s%s%s║\n╚%s╝%s\n' \
 		"${C_B}" "$(repeat_char $((w - 2)) '═')" \
-		"$(repeat_char \"$lp\" ' ')" "${C_BOLD}${C_W}" "$t" "${C_RESET}" "$(repeat_char \"$rp\" ' ')" \
+		"$(repeat_char "$lp" ' ')" "${C_BOLD}${C_W}" "$t" "${C_RESET}" "$(repeat_char "$rp" ' ')" \
 		"${C_B}$(repeat_char $((w - 2)) '═')" "${C_RESET}"
 }
 
@@ -68,8 +68,8 @@ print_progress_bar() {
 	printf '\n%s%s[%02d/%02d]%s %b%-15s%b %s%s%s%s%s\\n' \
 		"$C_BOLD" "$C_C" "$c" "$t" "$C_RESET" \
 		"$C_BOLD" "${l:0:15}" "$C_RESET" \
-		"$C_G" "$(repeat_char \"$f\" '■')" \
-		"$C_D" "$(repeat_char \"$e\" '·')" "$C_RESET"
+		"$C_G" "$(repeat_char "$f" '■')" \
+		"$C_D" "$(repeat_char "$e" '·')" "$C_RESET"
 }
 
 render_markdown() {
