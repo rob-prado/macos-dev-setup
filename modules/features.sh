@@ -44,7 +44,7 @@ install_managed() {
 			if [[ "$tool" == "java" ]]; then
 				lv=$(mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru | head -1 || true)
 			else
-				lv=$(mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+' | sort -Vr | head -1 || true)
+				lv=$(mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vr | head -1 || true)
 			fi
 			;;
 		xcodes) lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | awk '{print $1}' 2>/dev/null || echo "") ;;

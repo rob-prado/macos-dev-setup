@@ -80,7 +80,7 @@ get_remote_versions() {
 		if [[ "$tool" == "java" ]]; then
 			mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru || true
 		else
-			mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+' | sort -Vru || true
+			mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vru || true
 		fi
 		;;
 	xcodes)
