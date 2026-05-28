@@ -63,7 +63,7 @@ is_tool_version_installed() {
 			if command -v mise &>/dev/null; then
 				local mise_ver="$ver"
 				[[ "$tool" == "java" ]] && mise_ver="zulu-$ver"
-				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | grep -qE "^$mise_ver(\.|$)" && return 0
+				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' | grep -qE "^$mise_ver(\.|$)" && return 0
 			fi
 			;;
 		xcodes)

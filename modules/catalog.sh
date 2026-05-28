@@ -180,7 +180,7 @@ catalog_reconcile() {
 			mise)
 				if command -v mise &>/dev/null; then
 					is_installed=true
-					readarray -t vers < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' || true)
+					readarray -t vers < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' || true)
 				fi
 				;;
 			xcodes)

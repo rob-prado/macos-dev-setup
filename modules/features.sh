@@ -75,7 +75,7 @@ install_managed() {
 				fi
 			fi
 			
-			iv=$(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && $2=="'"$mise_ver"'"{print $2}' || true)
+			iv=$(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && $2=="'"$mise_ver"'" && !/\(missing\)/ {print $2}' || true)
 			if [[ -n "$iv" ]]; then
 				printf '
 %s✓ %s %s ok%s
@@ -148,7 +148,7 @@ uninstall_managed_version() {
 	case "$manager" in
 	mise)
 		if command -v mise &>/dev/null; then
-			readarray -t inst_versions < <(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | sed 's/^zulu-//' || true)
+			readarray -t inst_versions < <(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' || true)
 		fi
 		;;
 	xcodes)
@@ -484,7 +484,7 @@ remove_untracked_versions() {
 		case "$mgr" in
 		mise)
 			readarray -t inst < <(
-				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'"{print $2}' | sed 's/^zulu-//' || true
+				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' || true
 			)
 			;;
 		xcodes)

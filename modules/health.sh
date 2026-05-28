@@ -23,7 +23,7 @@ detect_drift() {
 			mise)
 				if command -v mise &>/dev/null; then
 					local -a installed wanted
-					readarray -t installed < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' || true)
+					readarray -t installed < <(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' || true)
 					readarray -t wanted < <(c_get_versions "$t")
 					for iv in "${installed[@]}"; do
 						local found=false

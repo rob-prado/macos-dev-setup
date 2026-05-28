@@ -16,7 +16,7 @@ snapshot_export() {
 			mise)
 				if command -v mise &>/dev/null; then
 					local mise_ver
-					mise_ver=$(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'"{print $2}' | sed 's/^zulu-//' | head -1 || true)
+					mise_ver=$(mise ls "$t" 2>/dev/null | awk '$1=="'"$t"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' | head -1 || true)
 					[[ -n "$mise_ver" ]] && resolved="$mise_ver"
 				fi
 				;;
