@@ -20,8 +20,8 @@ load_preset() {
 	fi
 	local preset_tools
 	preset_tools=$(get_preset_tools "$preset" 2>/dev/null || true)
-	[[ -z "${preset_tools:-}" ]] && err "Preset desconhecido: $preset"
-	confirm_destructive "Substituir catálogo com preset '$preset'?" || return 0
+	[[ -z "${preset_tools:-}" ]] && err "Unknown preset: $preset"
+	confirm_destructive "Replace catalog with preset '$preset'?" || return 0
 	msg "$C_C" "📦 Loading: $preset"
 	local nc="{\"schema_version\":$CATALOG_SCHEMA_VERSION,\"tools\":{" first=true
 	for t in $preset_tools; do
@@ -40,7 +40,7 @@ load_preset() {
 	done
 	nc+="}}"
 	echo "$nc" | jq '.' >"$CATALOG_FILE"
-	msg "$C_G" "✅ Catálogo atualizado com o preset '$preset'."
+	msg "$C_G" "✅ Catalog updated with preset '$preset'."
 }
 
 is_tool_version_installed() {
@@ -89,7 +89,7 @@ ensure_project_version_files() {
 			if [[ "$DRY_RUN" != "1" ]]; then
 				echo "$node_v" >".node-version"
 			fi
-			msg "$C_G" "📝 .node-version → $node_v${current_nv:+ (era $current_nv)}"
+			msg "$C_G" "📝 .node-version → $node_v${current_nv:+ (was $current_nv)}"
 			any_created=true
 		fi
 	fi
@@ -107,7 +107,7 @@ ensure_project_version_files() {
 		[[ -f ".java-version" ]] && current_jv=$(cat .java-version 2>/dev/null | tr -d '[:space:]' || true)
 
 		local resolved_java="$java_v"
-		# Com mise, deixamos ele instalar e usar a versão passada
+		# Let mise install and use the passed version
 		
 		if [[ ! -f ".java-version" ]]; then
 			if [[ "$DRY_RUN" != "1" ]]; then
@@ -121,7 +121,7 @@ ensure_project_version_files() {
 				printf '%s
 ' "$resolved_java" >".java-version"
 			fi
-			msg "$C_G" "📝 .java-version → $resolved_java (atualizado de $current_jv)"
+			msg "$C_G" "📝 .java-version → $resolved_java (updated from $current_jv)"
 			any_created=true
 		fi
 	fi
@@ -130,8 +130,8 @@ ensure_project_version_files() {
 }
 
 print_version_activation_hint() {
-	printf '\n  %b💡 Para ativar as versões do projeto neste shell:%b\n' "$C_Y" "$C_RESET"
-	printf '     %bcd .%b  %b# dispara auto-switch do mise%b\n\n' "$C_BOLD$C_W" "$C_RESET" "$C_D" "$C_RESET"
+	printf '\n  %b💡 To activate project versions in this shell:%b\n' "$C_Y" "$C_RESET"
+	printf '     %bcd .%b  %b# triggers mise auto-switch%b\n\n' "$C_BOLD$C_W" "$C_RESET" "$C_D" "$C_RESET"
 }
 
 ensure_corepack_project_yarn() {
@@ -143,7 +143,7 @@ ensure_corepack_project_yarn() {
 	[[ "$major" -lt 2 ]] 2>/dev/null && return 0
 
 	if [[ "$DRY_RUN" == "1" ]]; then
-		msg "$C_G" "📦 corepack → yarn@$yarn_v (simulado)"
+		msg "$C_G" "📦 corepack → yarn@$yarn_v (simulated)"
 		return 0
 	fi
 
@@ -153,7 +153,7 @@ ensure_corepack_project_yarn() {
 
 	# Remove npm-installed global yarn — it shadows corepack shims
 	if npm list -g --depth=0 yarn 2>/dev/null | grep -q 'yarn@'; then
-		msg "$C_C" "🔄 Removendo yarn global (npm) para priorizar corepack..."
+		msg "$C_C" "🔄 Removing global yarn (npm) to prioritize corepack..."
 		npm uninstall -g yarn &>/dev/null || true
 	fi
 
@@ -377,7 +377,7 @@ sync_project_context() {
 				if [[ "$DRY_RUN" != "1" ]]; then
 					echo "$max_node" >".nvmrc"
 				fi
-				msg "$C_G" "📝 .nvmrc → $max_node (atualizado de $nvmrc_v)"
+				msg "$C_G" "📝 .nvmrc → $max_node (updated from $nvmrc_v)"
 			fi
 		fi
 		if [[ -f ".node-version" ]]; then
@@ -387,7 +387,7 @@ sync_project_context() {
 				if [[ "$DRY_RUN" != "1" ]]; then
 					echo "$max_node" >".node-version"
 				fi
-				msg "$C_G" "📝 .node-version → $max_node (atualizado de $nv_v)"
+				msg "$C_G" "📝 .node-version → $max_node (updated from $nv_v)"
 			fi
 		fi
 		if [[ -f "package.json" ]]; then
@@ -402,7 +402,7 @@ sync_project_context() {
 					else
 						rm -f "$tmp"
 					fi
-					msg "$C_G" "📝 package.json (.engines.node) → $max_node (atualizado de $pkg_node)"
+					msg "$C_G" "📝 package.json (.engines.node) → $max_node (updated from $pkg_node)"
 				else
 					rm -f "$tmp"
 				fi
@@ -419,7 +419,7 @@ sync_project_context() {
 				if [[ "$DRY_RUN" != "1" ]]; then
 					echo "$max_ruby" >".ruby-version"
 				fi
-				msg "$C_G" "📝 .ruby-version → $max_ruby (atualizado de $rv_v)"
+				msg "$C_G" "📝 .ruby-version → $max_ruby (updated from $rv_v)"
 			fi
 		fi
 		if [[ -f "package.json" ]]; then
@@ -434,7 +434,7 @@ sync_project_context() {
 					else
 						rm -f "$tmp"
 					fi
-					msg "$C_G" "📝 package.json (.rubyVersion) → $max_ruby (atualizado de $pkg_ruby)"
+					msg "$C_G" "📝 package.json (.rubyVersion) → $max_ruby (updated from $pkg_ruby)"
 				else
 					rm -f "$tmp"
 				fi
@@ -454,7 +454,7 @@ sync_project_context() {
 				if [[ "$DRY_RUN" != "1" ]]; then
 					echo "$max_java" >".java-version"
 				fi
-				msg "$C_G" "📝 .java-version → $max_java (atualizado de $jv_v)"
+				msg "$C_G" "📝 .java-version → $max_java (updated from $jv_v)"
 			fi
 		fi
 		if [[ -f "package.json" ]]; then
@@ -469,7 +469,7 @@ sync_project_context() {
 					else
 						rm -f "$tmp"
 					fi
-					msg "$C_G" "📝 package.json (.javaVersion) → $max_java (atualizado de $pkg_java)"
+					msg "$C_G" "📝 package.json (.javaVersion) → $max_java (updated from $pkg_java)"
 				else
 					rm -f "$tmp"
 				fi
@@ -491,7 +491,7 @@ sync_project_context() {
 					else
 						rm -f "$tmp"
 					fi
-					msg "$C_G" "📝 package.json (.packageManager) → yarn@$max_yarn (atualizado de yarn@$pkg_yarn)"
+					msg "$C_G" "📝 package.json (.packageManager) → yarn@$max_yarn (updated from yarn@$pkg_yarn)"
 				else
 					rm -f "$tmp"
 				fi
@@ -583,32 +583,32 @@ sync_project_context() {
 	}
 
 	if [[ ${#to_merge[@]} -gt 0 ]]; then
-		printf '\n  %b╭─ 🔍 Novos requisitos em %b%s%b ─╮%b\n' "$C_C" "$C_BOLD$C_W" "$(basename "$PWD")" "$C_RESET$C_C" "$C_RESET"
+		printf '\n  %b╭─ 🔍 New requirements in %b%s%b ─╮%b\n' "$C_C" "$C_BOLD$C_W" "$(basename "$PWD")" "$C_RESET$C_C" "$C_RESET"
 		printf '\n'
 		for item in "${to_merge[@]}"; do
 			_print_req_item "$item"
 		done
 		[[ "$needs_bundle" == "true" ]] && printf '     %b▸%b  %b%-18s%b %b→  Gemfile%b\n' "$C_C" "$C_RESET" "$C_W" "bundler" "$C_RESET" "$C_Y" "$C_RESET"
 		printf '\n'
-		if tui_confirm "Mesclar ao catálogo global e instalar?"; then
+		if tui_confirm "Merge into global catalog and install?"; then
 			merge_stack_into_catalog "${to_merge[@]}"
 			should_install=true
 		fi
 	else
-		printf '\n  %b╭─ 🔍 Requisitos do projeto não instalados ─╮%b\n' "$C_C" "$C_RESET"
+		printf '\n  %b╭─ 🔍 Uninstalled project requirements ─╮%b\n' "$C_C" "$C_RESET"
 		printf '\n'
 		for item in "${to_install[@]}"; do
 			_print_req_item "$item"
 		done
 		[[ "$needs_bundle" == "true" ]] && printf '     %b▸%b  %b%-18s%b %b→  Gemfile%b\n' "$C_C" "$C_RESET" "$C_W" "bundler" "$C_RESET" "$C_Y" "$C_RESET"
 		printf '\n'
-		if tui_confirm "Instalar agora?"; then
+		if tui_confirm "Install now?"; then
 			should_install=true
 		fi
 	fi
 
 	if [[ "$should_install" == "true" ]]; then
-		msg "$C_C" "🚀 Instalando ferramentas do projeto..."
+		msg "$C_C" "🚀 Installing project tools..."
 		ask_sudo
 		ensure_project_version_files "$node_req" "$ruby_req" "$java_req"
 
@@ -667,13 +667,13 @@ sync_project_context() {
 
 		# Install Gemfile dependencies via Bundler if present
 		if [[ -f "Gemfile" ]]; then
-			msg "$C_C" "💎 Instalando dependências Ruby via Bundler..."
-			run_step "Instalando" "Gems do Gemfile" "Gems do Gemfile" "Gems do Gemfile" "installed" run_in_ruby_env "gem install bundler --no-document && bundle install" || true
+			msg "$C_C" "💎 Installing Ruby dependencies via Bundler..."
+			run_step "Installing" "Gemfile gems" "Gemfile gems" "Gemfile gems" "installed" run_in_ruby_env "gem install bundler --no-document && bundle install" || true
 		fi
 
 		rm -f "$LOCK_FILE"
 		ensure_lockfile
-		msg "$C_G" "✅ Instalação concluída com sucesso!"
+		msg "$C_G" "✅ Installation completed successfully!"
 		print_version_activation_hint
 		exit 0
 	fi
@@ -703,7 +703,7 @@ merge_stack_into_catalog() {
 			[[ -n "$ver" ]] && _jq_update ".tools[\"$tool\"].version = \"$ver\""
 		fi
 	done
-	msg "$C_G" "✅ Catálogo global atualizado (Merge)."
+	msg "$C_G" "✅ Global catalog updated (Merge)."
 }
 
 first_run_auto_setup() {
@@ -717,15 +717,15 @@ first_run_auto_setup() {
 
 	for snap in "${candidates[@]}"; do
 		if [[ -f "$snap" ]]; then
-			msg "$C_C" "📥 Snapshot detectado: $snap"
-			tui_confirm "Importar automaticamente?" && {
+			msg "$C_C" "📥 Snapshot detected: $snap"
+			tui_confirm "Import automatically?" && {
 				snapshot_import "$snap"
 				return 0
 			}
 		fi
 	done
 
-	if tui_confirm "Catálogo vazio. Carregar um preset base?"; then
+	if tui_confirm "Empty catalog. Load a base preset?"; then
 		load_preset
 	fi
 }

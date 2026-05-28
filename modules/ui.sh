@@ -8,11 +8,11 @@ msg() {
 }
 
 warn() {
-	printf "%b⚠️  Atenção: %s%b\n" "$C_Y" "$1" "$C_RESET" >&2
+	printf "%b⚠️  Warning: %s%b\n" "$C_Y" "$1" "$C_RESET" >&2
 }
 
 err() {
-	printf "%b❌ Erro: %s%b\n" "$C_R" "$1" "$C_RESET" >&2
+	printf "%b❌ Error: %s%b\n" "$C_R" "$1" "$C_RESET" >&2
 	exit 1
 }
 
@@ -27,9 +27,9 @@ sudo() {
 	if [[ "$has_n" == "false" && -t 0 && -t 2 ]]; then
 		local prompt
 		prompt=$'\n'${C_Y}┌────────────────────────────────────────┐${C_RESET}$'\n'
-		prompt+=${C_Y}│  🔑 [SUDO] PRIVILÉGIOS REQUERIDOS       │${C_RESET}$'\n'
+		prompt+=${C_Y}│  🔑 [SUDO] PRIVILEGES REQUIRED          │${C_RESET}$'\n'
 		prompt+=${C_Y}└────────────────────────────────────────┘${C_RESET}$'\n'
-		prompt+=${C_BOLD}${C_W}Digite a senha para o usuário ${C_C}%u${C_W}:${C_RESET}$'\n❯ '
+		prompt+=${C_BOLD}${C_W}Enter password for user ${C_C}%u${C_W}:${C_RESET}$'\n❯ '
 		command sudo -p "$prompt" "$@"
 	else
 		command sudo "$@"

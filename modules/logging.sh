@@ -41,18 +41,18 @@ audit_report() {
 	local tr=${#AUDIT_REMOVED[@]}
 	local tm=${#AUDIT_MISSING[@]}
 	local tf=${#AUDIT_FAILED[@]}
-	local md="# Relatório de Execução
+	local md="# Execution Report
 "
 	md+="| Status | Count |
 |---|---|
 "
-	md+="| ✅ Instalados | $ti |
-| 🔄 Atualizados | $tu |
+	md+="| ✅ Installed | $ti |
+| 🔄 Updated | $tu |
 | ✔️ Uptodate | $td |
 | ⏭️ Skipped | $ts |
-| 🗑️ Removidos | $tr |
-| ℹ️ Ausentes | $tm |
-| ❌ Falhas | $tf |
+| 🗑️ Removed | $tr |
+| ℹ️ Missing | $tm |
+| ❌ Failures | $tf |
 "
 	if [[ $tf -gt 0 ]]; then
 		md+="

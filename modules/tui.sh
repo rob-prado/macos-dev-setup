@@ -38,7 +38,7 @@ tui_choose() {
             printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$opt"
             ((i++))
         done
-        printf "\n%bEscolha [1-%d]:%b " "$C_D" "$#" "$C_RESET"
+        printf "\n%bChoose [1-%d]:%b " "$C_D" "$#" "$C_RESET"
         read -r sel
         [[ -n "${sel:-}" && "$sel" -ge 1 && "$sel" -le $# ]] && echo "${!sel}" || return 1
     fi
@@ -73,7 +73,7 @@ tui_multi_choose() {
             printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$opt"
             ((i++))
         done
-        printf "\n%bSelecione (números separados por espaço):%b " "$C_D" "$C_RESET"
+        printf "\n%bSelect (numbers separated by spaces):%b " "$C_D" "$C_RESET"
         read -r -a sel_arr
         for s in "${sel_arr[@]}"; do
             local idx=$((s - 1))
@@ -115,7 +115,7 @@ tui_filter() {
             printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$r"
             ((i++))
         done
-        printf "\n%bEscolha [1-%d]:%b " "$C_D" "$#" "$C_RESET"
+        printf "\n%bChoose [1-%d]:%b " "$C_D" "$#" "$C_RESET"
         local sel
         read -r sel < /dev/tty
         if [[ -n "${sel:-}" && "$sel" -ge 1 && "$sel" -le $# ]]; then
@@ -140,8 +140,8 @@ tui_confirm() {
             sb="#EF4444"
         }
         gum confirm "$prompt" \
-            --affirmative "Sim" \
-            --negative "Não" \
+            --affirmative "Yes" \
+            --negative "No" \
             --prompt.foreground="$pf" \
             --selected.background="$sb" \
             --selected.foreground="#000000" \
@@ -149,9 +149,9 @@ tui_confirm() {
             --unselected.foreground="#F8F8F2" 2>&$err_fd
     else
         printf "\n%b⚠️  %s%b\n" "$C_Y" "$prompt" "$C_RESET"
-        printf "%bContinuar? [s/N]:%b " "$C_Y" "$C_RESET"
+        printf "%bContinue? [y/N]:%b " "$C_Y" "$C_RESET"
         read -r ans
-        [[ "${ans,,}" =~ ^(s|sim|y|yes)$ ]]
+        [[ "${ans,,}" =~ ^(y|yes)$ ]]
     fi
 }
 

@@ -105,7 +105,7 @@ run_step() {
 }
 
 ask_sudo() {
-	msg "$C_Y" "🔑 Privilégios necessários:"
+	msg "$C_Y" "🔑 Privileges required:"
 	sudo -v
 	while true; do
 		sudo -n true

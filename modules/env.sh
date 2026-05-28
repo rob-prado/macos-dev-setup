@@ -39,9 +39,9 @@ sudo() {
 		local c_y=$'\033[1;33m' c_c=$'\033[1;36m' c_w=$'\033[1;37m' c_reset=$'\033[0m'
 		local prompt
 		prompt=$'\n'"${c_y}┌────────────────────────────────────────┐${c_reset}"$'\n'
-		prompt+="${c_y}│  🔑 [SUDO] PRIVILÉGIOS REQUERIDOS       │${c_reset}"$'\n'
+		prompt+="${c_y}│  🔑 [SUDO] PRIVILEGES REQUIRED          │${c_reset}"$'\n'
 		prompt+="${c_y}└────────────────────────────────────────┘${c_reset}"$'\n'
-		prompt+="${c_w}Digite a senha para o usuário ${c_c}%u${c_w}:${c_reset}"$'\n❯ '
+		prompt+="${c_w}Enter password for user ${c_c}%u${c_w}:${c_reset}"$'\n❯ '
 		command sudo -p "$prompt" "$@"
 	else
 		command sudo "$@"
@@ -137,9 +137,9 @@ sudo() {
 		local c_y=$'\033[1;33m' c_c=$'\033[1;36m' c_w=$'\033[1;37m' c_reset=$'\033[0m'
 		local prompt
 		prompt=$'\n'"${c_y}┌────────────────────────────────────────┐${c_reset}"$'\n'
-		prompt+="${c_y}│  🔑 [SUDO] PRIVILÉGIOS REQUERIDOS       │${c_reset}"$'\n'
+		prompt+="${c_y}│  🔑 [SUDO] PRIVILEGES REQUIRED          │${c_reset}"$'\n'
 		prompt+="${c_y}└────────────────────────────────────────┘${c_reset}"$'\n'
-		prompt+="${c_w}Digite a senha para o usuário ${c_c}%u${c_w}:${c_reset}"$'\n❯ '
+		prompt+="${c_w}Enter password for user ${c_c}%u${c_w}:${c_reset}"$'\n❯ '
 		command sudo -p "$prompt" "$@"
 	else
 		command sudo "$@"

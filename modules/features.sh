@@ -8,7 +8,7 @@ install_managed() {
 	else
 		readarray -t versions < <(c_get_versions "$tool")
 	fi
-	brew list "$tool" &>/dev/null && run_bg "Limpando" "$tool" brew uninstall --force "$tool" || true
+	brew list "$tool" &>/dev/null && run_bg "Cleaning" "$tool" brew uninstall --force "$tool" || true
 
 	case "$manager" in
 	mise)
@@ -87,13 +87,17 @@ install_managed() {
 				fi
 				success=true
 			else
-				if run_step "Instalando" "${tool^} $v" "${tool^} $v" "${tool^} $v" "installed" mise install -y "$tool@$mise_ver"; then
+				if run_step "Installing" "${tool^} $v" "${tool^} $v" "${tool^} $v" "installed" mise install -y "$tool@$mise_ver"; then
 					success=true
 				fi
 			fi
 			if [[ "$success" == "true" ]]; then
 				mise use -g "$tool@$mise_ver" >/dev/null 2>&1 || true
 				[[ "$tool" == "java" ]] && c_add_version "$tool" "$v"
+				if [[ "$tool" == "node" ]]; then
+					mise exec "node@$mise_ver" -- corepack disable yarn >/dev/null 2>&1 || true
+					mise exec "node@$mise_ver" -- npm uninstall -g yarn >/dev/null 2>&1 || true
+				fi
 				register_tool_state "$tool" "$v" "installed"
 			fi
 		done
@@ -114,8 +118,8 @@ install_managed() {
 				fi
 				success=true
 			else
-				msg "$C_Y" "⚠️ Xcode $v requer Apple ID (senha + 2FA)"
-				printf '  %b📲 A instalação será interativa — insira suas credenciais Apple quando solicitado.%b
+				msg "$C_Y" "⚠️ Xcode $v requires Apple ID (password + 2FA)"
+				printf '  %b📲 Installation will be interactive — enter your Apple credentials when prompted.%b
 
 ' "$C_W" "$C_RESET"
 				if [[ "$DRY_RUN" == "1" ]]; then
@@ -159,7 +163,7 @@ uninstall_managed_version() {
 	esac
 
 	if [[ ${#inst_versions[@]} -eq 0 ]]; then
-		warn "Nenhuma versão de $tool está instalada."
+		warn "No versions of $tool are installed."
 		return 0
 	fi
 
@@ -167,7 +171,7 @@ uninstall_managed_version() {
 	readarray -t sorted_inst_versions < <(printf '%s\n' "${inst_versions[@]}" | sort -Vru)
 
 	local choice_output
-	choice_output=$(tui_multi_choose "Selecione as versões de $tool para remover:" "${sorted_inst_versions[@]}") || return 0
+	choice_output=$(tui_multi_choose "Select versions of $tool to remove:" "${sorted_inst_versions[@]}") || return 0
 	local -a selected_vers=()
 	while IFS= read -r line; do
 		[[ -n "${line:-}" ]] && selected_vers+=("$line")
@@ -175,13 +179,13 @@ uninstall_managed_version() {
 
 	if [[ ${#selected_vers[@]} -eq 0 ]]; then
 		if [[ "$HAS_GUM" == "true" ]]; then
-			warn "Nenhuma versão selecionada via interface gráfica."
-			printf "%bAlternando para seleção manual por números:%b\n" "$C_Y" "$C_RESET"
+			warn "No versions selected via graphical interface."
+			printf "%bSwitching to manual number selection:%b\n" "$C_Y" "$C_RESET"
 		fi
 		for i in "${!sorted_inst_versions[@]}"; do
 			printf '  %d) %s\n' "$((i + 1))" "${sorted_inst_versions[$i]}"
 		done
-		printf '%s' "${C_DIM}Digite os números das versões (separados por espaço): ${C_RESET}"
+		printf '%s' "${C_DIM}Enter version numbers (separated by spaces): ${C_RESET}"
 		local -a sn
 		read -r -a sn </dev/tty
 		for s in "${sn[@]}"; do
@@ -196,7 +200,7 @@ uninstall_managed_version() {
 	fi
 
 	if [[ ${#selected_vers[@]} -eq 0 ]]; then
-		warn "Nenhuma versão selecionada."
+		warn "No versions selected."
 		return 0
 	fi
 
@@ -210,10 +214,10 @@ uninstall_managed_version() {
 					mise_ver="zulu-${v%%.*}"
 				fi
 			fi
-			run_step "Removendo" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
+			run_step "Removing" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
 			;;
 		xcodes)
-			run_step "Removendo" "Xcode $v" "Xcode $v" "Xcode $v" "removed" sudo xcodes uninstall "$v"
+			run_step "Removing" "Xcode $v" "Xcode $v" "Xcode $v" "removed" sudo xcodes uninstall "$v"
 			;;
 		esac
 
@@ -224,8 +228,22 @@ uninstall_managed_version() {
 	readarray -t rem_versions < <(c_get_versions "$tool")
 	if [[ ${#rem_versions[@]} -eq 0 ]]; then
 		update_lock_entry "$tool" "" "removed"
+		if [[ "$manager" == "mise" ]]; then
+			mise use -g --remove "$tool" >/dev/null 2>&1 || true
+		fi
 	else
 		update_lock_entry "$tool" "${rem_versions[-1]}" "installed"
+		if [[ "$manager" == "mise" ]]; then
+			local latest_v="${rem_versions[-1]}"
+			local latest_mise_ver="$latest_v"
+			if [[ "$tool" == "java" ]]; then
+				latest_mise_ver="zulu-$latest_v"
+				if ! mise ls-remote java 2>/dev/null | grep -q "$latest_mise_ver"; then
+					latest_mise_ver="zulu-${latest_v%%.*}"
+				fi
+			fi
+			mise use -g "$tool@$latest_mise_ver" >/dev/null 2>&1 || true
+		fi
 	fi
 }
 
@@ -251,13 +269,13 @@ process_tool() {
 		esac
 		case "$type" in
 		cask)
-			run_step "Removendo" "$tool" "$tool" "$tool" "removed" brew uninstall --cask --force "$tool" || audit_log missing "$tool"
+			run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --cask --force "$tool" || audit_log missing "$tool"
 			;;
 		gem)
 			if command -v gem &>/dev/null; then
-				run_step "Removendo" "$tool" "$tool" "$tool" "removed" gem uninstall "$tool" -a -x || audit_log missing "$tool"
+				run_step "Removing" "$tool" "$tool" "$tool" "removed" gem uninstall "$tool" -a -x || audit_log missing "$tool"
 			else
-				printf '\r  %b✔%b  %-12s %b%s%b\n' "$C_G" "$C_RESET" "Removendo" "$C_BOLD" "$tool" "$C_RESET"
+				printf '\r  %b✔%b  %-12s %b%s%b\n' "$C_G" "$C_RESET" "Removing" "$C_BOLD" "$tool" "$C_RESET"
 				audit_log removed "$tool"
 			fi
 			;;
@@ -266,8 +284,9 @@ process_tool() {
 			mgr=$(c_get "$tool" "manager")
 			case "$mgr" in
 			mise)
-				run_step "Removendo" "$tool" "versões do ${tool^}" "versões do ${tool^}" "removed" mise uninstall --all "$tool" || audit_log missing "$tool"
-				brew list "$tool" &>/dev/null && run_bg "Limpando" "$tool" brew uninstall --force "$tool" || true
+				run_step "Removing" "$tool" "${tool^} versions" "${tool^} versions" "removed" mise uninstall --all "$tool" || audit_log missing "$tool"
+				mise use -g --remove "$tool" >/dev/null 2>&1 || true
+				brew list "$tool" &>/dev/null && run_bg "Cleaning" "$tool" brew uninstall --force "$tool" || true
 				;;
 			xcodes)
 				local -a x_vers=()
@@ -275,18 +294,18 @@ process_tool() {
 					readarray -t x_vers < <(xcodes installed 2>/dev/null | awk '{print $1}' || true)
 					for xv in "${x_vers[@]}"; do
 						if [[ -n "${xv:-}" ]]; then
-							run_step "Removendo" "Xcode $xv" "Xcode $xv" "Xcode $xv" "removed" sudo xcodes uninstall "$xv" || true
+							run_step "Removing" "Xcode $xv" "Xcode $xv" "Xcode $xv" "removed" sudo xcodes uninstall "$xv" || true
 						fi
 					done
 				fi
 				;;
 			*)
-				run_step "Removendo" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$mgr" || audit_log missing "$tool"
+				run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$mgr" || audit_log missing "$tool"
 				;;
 			esac
 			;;
 		*)
-			run_step "Removendo" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$tool" || audit_log missing "$tool"
+			run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$tool" || audit_log missing "$tool"
 			;;
 		esac
 		update_lock_entry "$tool" "" "removed"
@@ -299,7 +318,7 @@ process_tool() {
 			local mgr
 			mgr=$(c_get "$tool" "manager")
 			local versions_str
-			versions_str=$(run_bg_capture "Buscando" "versões remotas de $tool" get_remote_versions "$tool" "$mgr") || true
+			versions_str=$(run_bg_capture "Fetching" "remote versions of $tool" get_remote_versions "$tool" "$mgr") || true
 			local -a rem_versions=()
 			if [[ -n "${versions_str:-}" ]]; then
 				readarray -t rem_versions <<<"$versions_str"
@@ -309,33 +328,30 @@ process_tool() {
 				[[ -n "${v:-}" ]] && clean_rem_versions+=("$v")
 			done
 			if [[ ${#clean_rem_versions[@]} -gt 0 ]]; then
-				local -a choose_opts=("padrão (LTS / mais recente)")
+				local -a choose_opts=("default (LTS / latest)")
 				choose_opts+=("${clean_rem_versions[@]}")
 				local selected_choice
-				selected_choice=$(tui_choose "Selecione a versão de $tool a instalar/atualizar:" "${choose_opts[@]}") || return 0
-				if [[ "$selected_choice" == "padrão (LTS / mais recente)" ]]; then
+				selected_choice=$(tui_choose "Select version of $tool to install/update:" "${choose_opts[@]}") || return 0
+				if [[ "$selected_choice" == "default (LTS / latest)" ]]; then
 					target_ver=""
 				else
 					target_ver="$selected_choice"
 				fi
 			else
-				target_ver=$(tui_input "Falha ao buscar versões. Digite a versão de $tool a instalar/atualizar (deixe em branco para padrão):")
+				target_ver=$(tui_input "Failed to fetch versions. Enter version of $tool to install/update (leave blank for default):")
 			fi
 		fi
 		install_managed "$tool" "$(c_get "$tool" "manager")" "$mode" "${target_ver:-}"
 		fv=$(c_get_versions "$tool" | tail -1)
 	elif [[ "$type" == "gem" ]]; then
-		local ce
-		ce="set +u; [[ -f '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh' ]] && source '$BREW_PREFIX/opt/chruby/share/chruby/chruby.sh' && chruby \$(chruby | sed 's/ \*//' | sort -V | tail -1)"
-		if ! "$BREW_BASH" -c "${ce}; gem list -i '${tool}' &>/dev/null" 2>/dev/null; then
+		if ! run_in_ruby_env "gem list -i '${tool}' &>/dev/null" 2>/dev/null; then
 			run_step \
-				"Instalando" \
+				"Installing" \
 				"$tool" \
 				"Gem $tool" \
 				"Gem $tool" \
 				"installed" \
-				"$BREW_BASH" \
-				-c "${ce}; gem install '$tool' --no-document" || true
+				run_in_ruby_env "gem install '$tool' --no-document" || true
 		else
 			printf '\r%s✓ Gem %s ok%s\n' \
 				"${C_D}" \
@@ -347,17 +363,9 @@ process_tool() {
 		fi
 		if [[ "$mode" == "update" ]]; then
 			local bv av
-			bv=$(
-				"$BREW_BASH" -c "${ce}; gem list '$tool' --exact 2>/dev/null |
-				grep -oE '[0-9]+\.[0-9]+\.[0-9]+' |
-				head -1" || true
-			)
-			if run_bg "Update" "$tool" "$BREW_BASH" -c "${ce}; gem update '$tool' --no-document"; then
-				av=$(
-					"$BREW_BASH" -c "${ce}; gem list '$tool' --exact 2>/dev/null |
-					grep -oE '[0-9]+\.[0-9]+\.[0-9]+' |
-					head -1" || true
-				)
+			bv=$(run_in_ruby_env "gem list '$tool' --exact 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1" || true)
+			if run_bg "Update" "$tool" run_in_ruby_env "gem update '$tool' --no-document"; then
+				av=$(run_in_ruby_env "gem list '$tool' --exact 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1" || true)
 				if [[ "${bv:-}" != "${av:-}" ]]; then
 					audit_log updated "Gem $tool ${bv:-}→${av:-}"
 				else
@@ -367,11 +375,7 @@ process_tool() {
 				audit_log failed "Gem $tool"
 			fi
 		fi
-		fv=$(
-			"$BREW_BASH" -c "${ce}; gem list -e '${tool}' |
-			grep -oE '[0-9]+\.[0-9]+\.[0-9]+' |
-			head -1" || true
-		)
+		fv=$(run_in_ruby_env "gem list -e '${tool}' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1" || true)
 		[[ -n "${fv:-}" ]] && c_set_version "$tool" "$fv"
 	else
 		local bh=false
@@ -436,7 +440,7 @@ process_tool() {
 			fi
 		else
 			run_step \
-				"Instalando" \
+				"Installing" \
 				"$tool" \
 				"$tool" \
 				"$tool" \
@@ -454,7 +458,7 @@ process_tool() {
 	fi
 	if [[ "$mode" != "uninstall" ]] && ! health_check "$tool" "$type"; then
 		audit_log failed "$tool (health)"
-		warn "Health check falhou: $tool"
+		warn "Health check failed: $tool"
 	fi
 	local st="installed"
 	if [[ "$mode" == "update" ]]; then

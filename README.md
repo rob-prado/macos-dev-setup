@@ -106,12 +106,12 @@ When you run the script, you'll be presented with an interactive menu:
 
 | Option | Description |
 |--------|-------------|
-| **Instalar Tudo** | Install all tools defined in your catalog |
-| **Atualizar Tudo** | Update every installed tool to its latest version |
-| **Atualizar Ferramenta** | Selectively update specific tools |
-| **Adicionar Ferramenta** | Search Homebrew and add a new tool to your catalog |
-| **Remover Ferramenta** | Selectively uninstall specific tools |
-| **Desinstalar Tudo** | Complete uninstall — removes all tools, configs, and SDKs |
+| **Install All** | Install all tools defined in your catalog |
+| **Update All** | Update every installed tool to its latest version |
+| **Update Tool** | Selectively update specific tools |
+| **Add Tool** | Search Homebrew and add a new tool to your catalog |
+| **Remove Tool** | Selectively uninstall specific tools |
+| **Uninstall All** | Complete uninstall — removes all tools, configs, and SDKs |
 
 ### Advanced Flags
 - `--dry-run`: Simulates the entire dependency resolution and project context merge without touching the system.

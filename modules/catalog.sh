@@ -5,7 +5,7 @@ migrate_catalog() {
 	local current
 	current=$(jq -r '.schema_version // 1' "$CATALOG_FILE" 2>/dev/null || echo 1)
 	if [[ "$current" -lt 2 ]]; then
-		msg "$C_C" "🔄 Migrando catálogo v$current → v$CATALOG_SCHEMA_VERSION..."
+		msg "$C_C" "🔄 Migrating catalog v$current → v$CATALOG_SCHEMA_VERSION..."
 		local tmp
 		tmp=$(mktemp)
 		TMP_FILES+=("$tmp")
@@ -21,10 +21,10 @@ migrate_catalog() {
 		else
 			rm -f "$tmp"
 		fi
-		msg "$C_G" "✅ Migração concluída."
+		msg "$C_G" "✅ Migration complete."
 	fi
 	if [[ "$current" -lt 3 ]]; then
-		msg "$C_C" "🔄 Migrando catálogo v$current → v3..."
+		msg "$C_C" "🔄 Migrating catalog v$current → v3..."
 		local tmp
 		tmp=$(mktemp)
 		TMP_FILES+=("$tmp")
@@ -47,7 +47,7 @@ migrate_catalog() {
 		else
 			rm -f "$tmp"
 		fi
-		msg "$C_G" "✅ Migração para v3 concluída."
+		msg "$C_G" "✅ Migration to v3 complete."
 	fi
 }
 
@@ -60,7 +60,7 @@ EOF
 
 validate_catalog_schema() {
 	local schema='.tools | type == "object" and all(.[]; has("type") and (.type | test("^(formula|cask|managed|gem)$")) and if .type == "managed" then has("manager") else true end)'
-	jq -e "$schema" "$CATALOG_FILE" >/dev/null 2>&1 || err "Catálogo inválido. Schema não respeitado."
+	jq -e "$schema" "$CATALOG_FILE" >/dev/null 2>&1 || err "Invalid catalog. Schema validation failed."
 }
 
 _jq_update() {

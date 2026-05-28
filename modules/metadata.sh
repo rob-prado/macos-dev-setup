@@ -54,7 +54,7 @@ resolve_dependencies_rec() {
 	fi
 
 	if [[ " $VISITING_LIST " == *" $tool "* ]]; then
-		err "Erro: Dependência circular detectada envolvendo a ferramenta '$tool'!"
+		err "Error: Circular dependency detected involving tool '$tool'!"
 	fi
 
 	VISITING_LIST="${VISITING_LIST} ${tool}"

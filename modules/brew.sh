@@ -56,13 +56,13 @@ run_brew_bundle() {
 	local total=${#bundled[@]}
 	printf '\n'
 	printf '  %b┌──────────────────────────────────────────────┐%b\n' "$C_C" "$C_RESET"
-	printf '  %b│  📦  Brew Bundle — Instalação em lote        │%b\n' "$C_C" "$C_RESET"
-	printf '  %b│  %b%d ferramenta(s)%b serão instaladas via Brew  %b│%b\n' \
+	printf '  %b│  📦  Brew Bundle — Batch Install              │%b\n' "$C_C" "$C_RESET"
+	printf '  %b│  %b%d tool(s)%b will be installed via Brew      %b│%b\n' \
 		"$C_C" "$C_W" "$total" "$C_RESET" "$C_C" "$C_RESET"
 	printf '  %b└──────────────────────────────────────────────┘%b\n' "$C_C" "$C_RESET"
 
 	if [[ ${#formulas[@]} -gt 0 ]]; then
-		printf '\n  %b🍺 Fórmulas:%b\n' "$C_Y" "$C_RESET"
+		printf '\n  %b🍺 Formulas:%b\n' "$C_Y" "$C_RESET"
 		for f in "${formulas[@]}"; do
 			printf '     %b▸%b %s\n' "$C_C" "$C_RESET" "$f"
 		done
@@ -89,9 +89,9 @@ run_brew_bundle() {
 				c_set_version "$t" "$bv"
 			fi
 		done
-		printf '  %b✅ Brew Bundle concluído com sucesso!%b\n\n' "$C_G" "$C_RESET"
+		printf '  %b✅ Brew Bundle completed successfully!%b\n\n' "$C_G" "$C_RESET"
 	else
-		warn "Bundle falhou. Fallback individual."
+		warn "Bundle failed. Falling back to individual install."
 		rm -f "$bf"
 		return 1
 	fi

@@ -150,27 +150,27 @@ source "$SCRIPT_DIR/modules/project.sh"
 # ==============================================================================
 
 pre_flight_checks() {
-	safe_curl -s --head --request GET https://www.apple.com/library/test/success.html >/dev/null 2>&1 || err "Sem conexão com a internet."
-	for d in git curl awk grep sed find xargs; do command -v "$d" >/dev/null 2>&1 || err "Dependência nativa ausente: $d"; done
-	[[ -w "$HOME" ]] || err "Sem permissão de escrita em \$HOME"
+	safe_curl -s --head --request GET https://www.apple.com/library/test/success.html >/dev/null 2>&1 || err "No internet connection."
+	for d in git curl awk grep sed find xargs; do command -v "$d" >/dev/null 2>&1 || err "Missing native dependency: $d"; done
+	[[ -w "$HOME" ]] || err "No write permission to \$HOME"
 }
 
 full_uninstall() {
-	confirm_destructive "APAGAR TUDO (SDKs, Rubies, Xcodes, Configs)?" || return 0
+	confirm_destructive "DELETE EVERYTHING (SDKs, Rubies, Xcodes, Configs)?" || return 0
 	local -a tools
 	readarray -t tools < <(get_managed_tools_list)
 	TOTAL_TOOLS=${#tools[@]}
 	CURRENT_TOOL_INDEX=0
 	for t in "${tools[@]}"; do process_tool "$t" "uninstall" || true; done
-	run_bg "Expurgo" "pastas" clean_folders_job || true
-	run_bg "Perfis" "shell rc" clean_profiles_job || true
+	run_bg "Purge" "folders" clean_folders_job || true
+	run_bg "Profiles" "shell rc" clean_profiles_job || true
 	rm -f "$ENV_FILE"
 	local tr
 	tr=$(get_target_rc)
 	[[ -f "$tr" ]] && sed -i '' "/\.config\/mac-dev\/env\.sh/d" "$tr" 2>/dev/null || true
 	rn_cleanup
 	audit_report
-	notify "mac-dev-setup" "Desinstalação completa"
+	notify "mac-dev-setup" "Full uninstall complete"
 }
 
 do_all() {
@@ -197,7 +197,7 @@ do_all() {
 	done
 
 	if [[ ${#tools_to_process[@]} -eq 0 ]]; then
-		msg "$C_G" "✅ Nenhuma ferramenta ativa para instalar ou atualizar."
+		msg "$C_G" "✅ No active tools to install or update."
 		return 0
 	fi
 
@@ -220,8 +220,8 @@ do_all() {
 	[[ "$mode" == "install" || "$mode" == "update" ]] && run_brew_bundle "$mode" || true
 	for t in "${tools_to_process[@]}"; do remove_untracked_versions "$t"; done
 	rn_cleanup
-	msg "$C_G" "✅ Concluído. Reinicie o terminal."
-	notify "mac-dev-setup" "Setup concluído com sucesso"
+	msg "$C_G" "✅ Done. Restart your terminal."
+	notify "mac-dev-setup" "Setup completed successfully"
 	[[ "$mode" == "install" || "$mode" == "update" ]] && audit_report
 }
 
@@ -245,14 +245,14 @@ do_selective() {
 			if [[ $installed_count -ge 1 ]]; then
 				actions+=("update" "uninstall")
 			fi
-			action=$(tui_choose "⚙️ Ação:" "${actions[@]}") || return 0
-			printf "⚙️ Ação: %b%s%b\n" "$C_C" "$action" "$C_RESET"
+			action=$(tui_choose "⚙️ Action:" "${actions[@]}") || return 0
+			printf "⚙️ Action: %b%s%b\n" "$C_C" "$action" "$C_RESET"
 		else
 			if [[ $installed_count -ge 1 ]]; then
-				action=$(tui_input "Ação (install/update/uninstall): " "install")
+				action=$(tui_input "Action (install/update/uninstall): " "install")
 			else
 				action="install"
-				printf "⚙️ Ação: %b%s%b\n" "$C_C" "install" "$C_RESET"
+				printf "⚙️ Action: %b%s%b\n" "$C_C" "install" "$C_RESET"
 			fi
 		fi
 	fi
@@ -271,11 +271,11 @@ do_selective() {
 
 	if [[ ${#display_tools[@]} -eq 0 ]]; then
 		if [[ "$action" == "uninstall" ]]; then
-			warn "Nenhuma ferramenta instalada para desinstalar."
+			warn "No installed tools to uninstall."
 		elif [[ "$action" == "update" ]]; then
-			warn "Nenhuma ferramenta instalada para atualizar."
+			warn "No installed tools to update."
 		else
-			warn "Nenhuma ferramenta disponível."
+			warn "No tools available."
 		fi
 		return 0
 	fi
@@ -283,7 +283,7 @@ do_selective() {
 	local -a selected=()
 	if [[ "$HAS_GUM" == "true" ]]; then
 		local choice_output
-		choice_output=$(tui_multi_choose "🔧 Selecione com [Espaço] e confirme com [Enter]:" "${display_tools[@]}") || return 0
+		choice_output=$(tui_multi_choose "🔧 Select with [Space] and confirm with [Enter]:" "${display_tools[@]}") || return 0
 		while IFS= read -r line; do
 			if [[ -n "${line:-}" ]]; then
 				selected+=("$line")
@@ -293,13 +293,13 @@ do_selective() {
 
 	if [[ ${#selected[@]} -eq 0 ]]; then
 		if [[ "$HAS_GUM" == "true" ]]; then
-			warn "Nenhuma ferramenta selecionada via interface gráfica."
-			printf "%bAlternando para seleção manual por números:%b\n" "$C_Y" "$C_RESET"
+			warn "No tools selected via graphical interface."
+			printf "%bSwitching to manual number selection:%b\n" "$C_Y" "$C_RESET"
 		fi
 		for i in "${!display_tools[@]}"; do
 			printf '  %d) %s\n' "$((i + 1))" "${display_tools[$i]}"
 		done
-		printf '%s' "${C_DIM}Digite os números das ferramentas (separados por espaço): ${C_RESET}"
+		printf '%s' "${C_DIM}Enter tool numbers (separated by spaces): ${C_RESET}"
 		local -a sn
 		read -r -a sn </dev/tty
 		for s in "${sn[@]}"; do
@@ -314,10 +314,10 @@ do_selective() {
 	fi
 
 	[[ ${#selected[@]} -eq 0 ]] && {
-		warn "Nada selecionado."
+		warn "Nothing selected."
 		return 0
 	}
-	printf "🔧 Ferramentas selecionadas: %b%s%b\n" "$C_C" "${selected[*]}" "$C_RESET"
+	printf "🔧 Selected tools: %b%s%b\n" "$C_C" "${selected[*]}" "$C_RESET"
 	local SELECTIVE_MODE=true
 	TOTAL_TOOLS=${#selected[@]}
 	CURRENT_TOOL_INDEX=0
@@ -339,9 +339,9 @@ post_operation_hook() {
 do_search() {
 	local query
 	if [[ "$HAS_GUM" == "true" ]]; then
-		query=$(tui_input "🔍 Buscar:" "node")
+		query=$(tui_input "🔍 Search:" "node")
 	else
-		query=$(tui_input "Ferramenta: " "node")
+		query=$(tui_input "Tool: " "node")
 	fi
 
 	if [[ -z "${query:-}" ]]; then
@@ -368,18 +368,18 @@ do_search() {
 	done
 
 	if [[ ${#res[@]} -eq 0 ]]; then
-		err "Nada encontrado."
+		err "Nothing found."
 	fi
 
 	local target
 	if [[ "$HAS_GUM" == "true" ]]; then
-		target=$(tui_filter "Selecione:" "${res[@]}") || return 0
-		printf "📦 Selecionado: %b%s%b\n" "$C_C" "$target" "$C_RESET"
+		target=$(tui_filter "Select:" "${res[@]}") || return 0
+		printf "📦 Selected: %b%s%b\n" "$C_C" "$target" "$C_RESET"
 	else
 		for i in "${!res[@]}"; do
 			printf '  %d) %s\n' "$((i + 1))" "${res[$i]}"
 		done
-		printf '%s' "${C_DIM}Escolha: ${C_RESET}"
+		printf '%s' "${C_DIM}Choose: ${C_RESET}"
 		read -r sel
 		if [[ -z "${sel:-}" || "$sel" -le 0 || "$sel" -gt ${#res[@]} ]]; then
 			return 0
@@ -390,7 +390,7 @@ do_search() {
 	et=$(c_get "$target" "type")
 	mgr=$(get_known_managed "$target" 2>/dev/null || true)
 	if [[ -n "${et:-}" && -n "${mgr:-}" ]]; then
-		confirm_destructive "Sobrescrever $target ($et)?" || return 0
+		confirm_destructive "Overwrite $target ($et)?" || return 0
 	fi
 	if [[ -n "${mgr:-}" ]]; then
 		_jq_update ".tools["$target"] = {"type":"managed","manager":"$mgr","versions":[]}"
@@ -429,12 +429,12 @@ dry_run() {
 		if [[ $dr_total -gt 0 ]]; then
 			printf '\n'
 			printf '  %b┌──────────────────────────────────────────────┐%b\n' "$C_C" "$C_RESET"
-			printf '  %b│  📦  Brew Bundle — Instalação em lote        │%b\n' "$C_C" "$C_RESET"
-			printf '  %b│  %b%d ferramenta(s)%b serão instaladas via Brew  %b│%b\n' \
+			printf '  %b│  📦  Brew Bundle — Batch Install               │%b\n' "$C_C" "$C_RESET"
+			printf '  %b│  %b%d tool(s)%b will be installed via Brew       %b│%b\n' \
 				"$C_C" "$C_W" "$dr_total" "$C_RESET" "$C_C" "$C_RESET"
 			printf '  %b└──────────────────────────────────────────────┘%b\n' "$C_C" "$C_RESET"
 			if [[ ${#dr_formulas[@]} -gt 0 ]]; then
-				printf '\n  %b🍺 Fórmulas:%b\n' "$C_Y" "$C_RESET"
+				printf '\n  %b🍺 Formulas:%b\n' "$C_Y" "$C_RESET"
 				for f in "${dr_formulas[@]}"; do
 					printf '     %b▸%b %s\n' "$C_C" "$C_RESET" "$f"
 				done
@@ -468,14 +468,14 @@ dry_run() {
 			local -a v
 			readarray -t v < <(c_get_versions "$t")
 			if [[ ${#v[@]} -gt 0 ]]; then
-				printf '    └─ Versões: %s
+				printf '    └─ Versions: %s
 ' "$(printf '%s ' "${v[@]}")"
 			fi
 		fi
 	done
 	printf '
 %s
-' "${C_G}✅ Simulação OK.${C_RESET}"
+' "${C_G}✅ Simulation OK.${C_RESET}"
 }
 
 main() {
@@ -507,10 +507,10 @@ main() {
 		local lock_pid=""
 		[[ -f "$LOCK_DIR/pid" ]] && lock_pid="$(cat "$LOCK_DIR/pid")"
 		if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null && ps -p "$lock_pid" -o comm= | grep -q "bash"; then
-			err "Script já em execução (PID $lock_pid)."
+			err "Script already running (PID $lock_pid)."
 		else
 			rm -rf "$LOCK_DIR"
-			mkdir "$LOCK_DIR" 2>/dev/null || err "Não foi possível adquirir lock."
+			mkdir "$LOCK_DIR" 2>/dev/null || err "Could not acquire lock."
 		fi
 	fi
 	HAS_LOCK=true
@@ -520,10 +520,10 @@ main() {
 	exec > >(tee -a "$LOG_FILE") 2> >(tee -a "$LOG_FILE" >&4)
 	draw_box "macOS Dev Setup"
 
-	msg "$C_C" "🔍 Verificando conectividade e dependências nativas..."
+	msg "$C_C" "🔍 Checking connectivity and native dependencies..."
 	pre_flight_checks
 
-	msg "$C_C" "📦 Inicializando catálogo de ferramentas..."
+	msg "$C_C" "📦 Initializing tool catalog..."
 	catalog_init
 	migrate_catalog
 	validate_catalog_schema
@@ -541,7 +541,7 @@ main() {
 		exit 0
 	}
 
-	msg "$C_C" "⚙️  Carregando contexto e sincronizando projeto..."
+	msg "$C_C" "⚙️  Loading context and syncing project..."
 
 	# Migrate: suppress fnm output during shell init (Powerlevel10k compat)
 	if [[ -f "$ENV_FILE" ]] && grep -q 'fnm env --use-on-cd)' "$ENV_FILE" 2>/dev/null && ! grep -q 'log-level' "$ENV_FILE" 2>/dev/null; then
@@ -556,10 +556,10 @@ main() {
 	first_run_auto_setup
 	sync_project_context
 
-	msg "$C_C" "🔄 Verificando integridade e desvios..."
+	msg "$C_C" "🔄 Checking integrity and drift..."
 	startup_drift_check
 
-	msg "$C_G" "✨ Inicialização concluída!"
+	msg "$C_G" "✨ Initialization complete!"
 
 	local -i installed_count=0
 	local -i uninstalled_count=0
@@ -579,54 +579,54 @@ main() {
 
 	local -a menu_opts=()
 	if [[ $uninstalled_count -gt 0 ]]; then
-		menu_opts+=("Instalar Tudo")
+		menu_opts+=("Install All")
 	fi
 	if [[ $installed_count -gt 1 ]]; then
-		menu_opts+=("Atualizar Tudo")
+		menu_opts+=("Update All")
 	fi
 	if [[ $installed_count -ge 1 ]]; then
-		menu_opts+=("Atualizar Ferramenta")
+		menu_opts+=("Update Tool")
 	fi
-	menu_opts+=("Adicionar Ferramenta")
+	menu_opts+=("Add Tool")
 	if [[ $installed_count -ge 1 ]]; then
-		menu_opts+=("Remover Ferramenta")
+		menu_opts+=("Remove Tool")
 	fi
 	if [[ $installed_count -gt 1 ]]; then
-		menu_opts+=("Desinstalar Tudo")
+		menu_opts+=("Uninstall All")
 	fi
-	menu_opts+=("Sair")
+	menu_opts+=("Exit")
 
 	local opt
 	opt=$(tui_choose "macOS Dev Setup" "${menu_opts[@]}") || exit 0
 	printf "🚀 macOS Dev Setup: %b%s%b\n" "$C_C" "$opt" "$C_RESET"
 
 	case "$opt" in
-	*"Instalar Tudo"*)
+	*"Install All"*)
 		ask_sudo
 		do_all "install"
 		post_operation_hook "$opt"
 		;;
-	*"Atualizar Tudo"*)
+	*"Update All"*)
 		ask_sudo
 		do_all "update"
 		post_operation_hook "$opt"
 		;;
-	*"Atualizar Ferramenta"*)
+	*"Update Tool"*)
 		ask_sudo
 		do_selective "update"
 		post_operation_hook "$opt"
 		;;
-	*"Adicionar"*)
+	*"Add"*)
 		ask_sudo
 		do_search
 		post_operation_hook "$opt"
 		;;
-	*"Remover Ferramenta"*)
+	*"Remove Tool"*)
 		ask_sudo
 		do_selective "uninstall"
 		post_operation_hook "$opt"
 		;;
-	*"Desinstalar"*)
+	*"Uninstall"*)
 		ask_sudo
 		full_uninstall
 		post_operation_hook "$opt"

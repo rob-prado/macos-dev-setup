@@ -50,8 +50,8 @@ snapshot_export() {
 
 snapshot_import() {
 	local input="${1:-}"
-	[[ -z "${input:-}" || ! -f "$input" ]] && err "Snapshot não encontrado"
-	jq -e '.tools | type == "object"' "$input" >/dev/null 2>&1 || err "Snapshot inválido"
+	[[ -z "${input:-}" || ! -f "$input" ]] && err "Snapshot not found"
+	jq -e '.tools | type == "object"' "$input" >/dev/null 2>&1 || err "Invalid snapshot"
 	local -a snap_tools
 	readarray -t snap_tools < <(jq -r '.tools | keys[]' "$input" 2>/dev/null || true)
 	for t in "${snap_tools[@]}"; do
@@ -66,5 +66,5 @@ snapshot_import() {
 			_jq_update ".tools[\"$t\"].version = \"$ver\""
 		fi
 	done
-	msg "$C_G" "✅ Snapshot importado."
+	msg "$C_G" "✅ Snapshot imported."
 }
