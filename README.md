@@ -1,11 +1,15 @@
 # macOS Development Setup
 
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Platform: macOS](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)
+![Shell: Bash 4+](https://img.shields.io/badge/Shell-Bash%204%2B-green.svg)
+
 This repository provides a powerful, modular, and context-aware system for automating the installation and configuration of development tools on macOS. Originally a single script, it has evolved into a robust catalog-driven orchestrator.
 
 ## 🌟 Key Features
 
 ### 🧩 Modular Architecture
-The core `setup.sh` acts as an entrypoint, orchestrating 10+ discrete modules (UI, Logging, Project Context, Core Runners, Health Checks, etc.) located in the `modules/` directory. This ensures high maintainability and isolated logic.
+The core `setup.sh` acts as an entrypoint, orchestrating 15 discrete modules (UI, TUI, Logging, Project Context, Core Runners, Health Checks, etc.) located in the `modules/` directory. This ensures high maintainability and isolated logic.
 
 ### 📦 Catalog & Lockfile Driven
 - **JSON Catalog (`.mac-dev-catalog.json`)**: Defines tools, their types (`formula`, `cask`, `managed`, `gem`), and dependencies.
@@ -33,6 +37,9 @@ Generates a highly optimized `~/.config/mac-dev/env.sh` loaded by your shell (`z
 ### 🏥 Health Checks & Drift Detection
 Automatically detects "drift" — e.g., if a tool was uninstalled externally or if a symlink broke. The engine marks the tool state as dirty and reconciles it on the next run.
 
+### 🔍 Tool Search & Discovery
+Search for any tool available on Homebrew directly from the interactive menu. The script searches, lets you pick a result, auto-detects if it's a formula or cask, and installs it — all in one flow.
+
 ### 🎨 Beautiful TUI
 Uses `gum` (if installed) to provide a rich, interactive terminal UI for selecting actions like "Update/Remove Tool". Gracefully falls back to standard text inputs if `gum` is missing.
 
@@ -42,35 +49,69 @@ Includes robust cleanup jobs that clear heavy caches from Gradle, CocoaPods, Xco
 ### 📸 Snapshot Management
 Automatically exports JSON snapshots of your current environment state to `~/.mac-dev-snapshots/` after operations. You can import snapshots to reliably clone your setup across machines.
 
+## 📋 Requirements
+
+- **macOS** (Ventura 13+, Sonoma 14, Sequoia 15)
+- **Homebrew** — will be installed automatically if missing
+- **Bash 4+** — the script auto-installs it via Homebrew if only macOS's native Bash 3.2 is available
+- **Internet connection** — required for downloading tools and checking connectivity
+- Native tools (included with macOS): `git`, `curl`, `awk`, `grep`, `sed`, `find`, `xargs`
+- Optional: [`gum`](https://github.com/charmbracelet/gum) for the rich interactive TUI
+
 ## 🚀 Usage
 
-### How to run the script after downloading on Mac
-If you downloaded the project as a `.zip` file, it is highly recommended to move it out of your `Downloads` folder to your Home directory to keep your setup persistent and organized.
+### Installation
 
-Open your Terminal and follow these steps:
-
+#### Option A — Clone with Git (recommended)
 ```bash
-# 1. Move the extracted folder to your Home directory and navigate to it
+git clone https://github.com/rob-prado/macos-dev-setup.git ~/MacOS_Setup
+cd ~/MacOS_Setup
+chmod +x setup.sh
+```
+
+> Cloning with Git keeps the history and lets you update easily with `git pull`.
+
+#### Option B — Download as ZIP
+If you downloaded the project as a `.zip` file, move it out of `Downloads` to keep things organized:
+```bash
 mv ~/Downloads/MacOS_Setup-main ~/MacOS_Setup
 cd ~/MacOS_Setup
-
-# 2. Grant execution permission to the main script
 chmod +x setup.sh
-
-# 3. Execute the setup script
-./setup.sh
 ```
 
-### Creating a Global Alias (Optional)
-To run the setup script from anywhere without navigating to its folder, you can add an alias to your shell profile.
-
-Open your terminal and run the following command:
+### Creating a Global Alias
+To run the setup script from anywhere without navigating to its folder:
 ```bash
-echo 'alias mac-setup="~/MacOS_Setup/setup.sh"' >> ~/.zshrc
+echo 'alias setup="~/MacOS_Setup/setup.sh"' >> ~/.zshrc
 source ~/.zshrc
 ```
-Now you can simply type `mac-setup` in any terminal window to launch the orchestrator!
+Now you can simply type `setup` in any terminal window to launch the orchestrator!
 
+### Running the Script
+```bash
+setup
+```
+
+Or, to configure the tools for a specific project:
+```bash
+cd ~/path/to/project
+setup
+```
+
+After running the script, you can reload your shell profile by running `source ~/.zshrc`, restart your terminal, or open a new terminal window, or simply type `cd .` in the current directory to apply the changes.
+
+### Interactive Menu
+
+When you run the script, you'll be presented with an interactive menu:
+
+| Option | Description |
+|--------|-------------|
+| **Instalar Tudo** | Install all tools defined in your catalog |
+| **Atualizar Tudo** | Update every installed tool to its latest version |
+| **Atualizar Ferramenta** | Selectively update specific tools |
+| **Adicionar Ferramenta** | Search Homebrew and add a new tool to your catalog |
+| **Remover Ferramenta** | Selectively uninstall specific tools |
+| **Desinstalar Tudo** | Complete uninstall — removes all tools, configs, and SDKs |
 
 ### Advanced Flags
 - `--dry-run`: Simulates the entire dependency resolution and project context merge without touching the system.
@@ -92,18 +133,31 @@ Now you can simply type `mac-setup` in any terminal window to launch the orchest
 ## 🏗 Project Structure
 
 ```
-├── setup.sh             # Main entrypoint and CLI controller
-├── modules/             # Core logic split by domain
-│   ├── env.sh           # Shell profile & sudo wrapper generation
-│   ├── catalog.sh       # JSON state management
-│   ├── project.sh       # Local project context & sync
-│   ├── brew.sh          # Brewfile bundle generator
-│   └── ...              # (health, snapshot, features, core, ui, etc.)
-└── tests/               # Unit and integration tests
+├── setup.sh              # Main entrypoint and CLI controller
+├── modules/
+│   ├── utils.sh          # Utility & system helpers (retry, curl, notify)
+│   ├── ui.sh             # Printing & UI styling
+│   ├── logging.sh        # Logging, auditing & metrics
+│   ├── tui.sh            # Interactive terminal UI (gum integration)
+│   ├── env.sh            # Shell profile & sudo wrapper generation
+│   ├── catalog.sh        # JSON catalog state management
+│   ├── lock.sh           # Lockfile state tracking
+│   ├── metadata.sh       # Resolution & dependency engine
+│   ├── health.sh         # Conflicts, drift & health checks
+│   ├── snapshot.sh        # Snapshot export/import
+│   ├── core.sh           # Process runners & job controllers
+│   ├── brew.sh           # Brewfile bundle generator
+│   ├── features.sh       # Feature operations (install, update, uninstall)
+│   ├── cleanup.sh        # Cache purging & system cleanup
+│   └── project.sh        # Local project context & sync
+├── CONTRIBUTING.md       # Contribution guidelines
+└── LICENSE               # MIT License
 ```
 
 ## 🤝 Contributing
-Feel free to open issues or submit pull requests. Ensure that new logic is placed in the appropriate module and that `bash -n` syntax checks pass.
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on how to fork, branch, and submit pull requests.
 
 ## 📄 License
-See the `LICENSE` file for details.
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
