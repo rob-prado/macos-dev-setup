@@ -6,6 +6,8 @@
 
 This repository provides a powerful, modular, and context-aware system for automating the installation and configuration of development tools on macOS. Originally a single script, it has evolved into a robust catalog-driven orchestrator.
 
+<img width="480" height="486" alt="macos-dev-setup-remove" src="https://github.com/user-attachments/assets/1d8aee63-4b84-419e-b726-ac228cf8a091" />
+
 ## 🌟 Key Features
 
 ### 🧩 Modular Architecture
