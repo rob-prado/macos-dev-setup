@@ -226,6 +226,7 @@ do_all() {
 }
 
 do_selective() {
+	local action="$1"
 	local -a tools
 	readarray -t tools < <(get_managed_tools_list)
 	declare -g -A ALREADY_INSTALLED
@@ -237,21 +238,22 @@ do_selective() {
 	local -i installed_count
 	installed_count=$(count_installed_tools)
 
-	local action
-	if [[ "$HAS_GUM" == "true" ]]; then
-		local -a actions=()
-		actions+=("install")
-		if [[ $installed_count -ge 1 ]]; then
-			actions+=("update" "uninstall")
-		fi
-		action=$(tui_choose "⚙️ Ação:" "${actions[@]}") || return 0
-		printf "⚙️ Ação: %b%s%b\n" "$C_C" "$action" "$C_RESET"
-	else
-		if [[ $installed_count -ge 1 ]]; then
-			action=$(tui_input "Ação (install/update/uninstall): " "install")
+	if [[ -z "${action:-}" ]]; then
+		if [[ "$HAS_GUM" == "true" ]]; then
+			local -a actions=()
+			actions+=("install")
+			if [[ $installed_count -ge 1 ]]; then
+				actions+=("update" "uninstall")
+			fi
+			action=$(tui_choose "⚙️ Ação:" "${actions[@]}") || return 0
+			printf "⚙️ Ação: %b%s%b\n" "$C_C" "$action" "$C_RESET"
 		else
-			action="install"
-			printf "⚙️ Ação: %b%s%b\n" "$C_C" "install" "$C_RESET"
+			if [[ $installed_count -ge 1 ]]; then
+				action=$(tui_input "Ação (install/update/uninstall): " "install")
+			else
+				action="install"
+				printf "⚙️ Ação: %b%s%b\n" "$C_C" "install" "$C_RESET"
+			fi
 		fi
 	fi
 	[[ -z "${action:-}" ]] && return 0
@@ -582,7 +584,13 @@ main() {
 	if [[ $installed_count -gt 1 ]]; then
 		menu_opts+=("Atualizar Tudo")
 	fi
-	menu_opts+=("Ação Seletiva" "Adicionar Ferramenta")
+	if [[ $installed_count -ge 1 ]]; then
+		menu_opts+=("Atualizar Ferramenta")
+	fi
+	menu_opts+=("Adicionar Ferramenta")
+	if [[ $installed_count -ge 1 ]]; then
+		menu_opts+=("Remover Ferramenta")
+	fi
 	if [[ $installed_count -gt 1 ]]; then
 		menu_opts+=("Desinstalar Tudo")
 	fi
@@ -603,14 +611,19 @@ main() {
 		do_all "update"
 		post_operation_hook "$opt"
 		;;
-	*"Seletiva"*)
+	*"Atualizar Ferramenta"*)
 		ask_sudo
-		do_selective
+		do_selective "update"
 		post_operation_hook "$opt"
 		;;
 	*"Adicionar"*)
 		ask_sudo
 		do_search
+		post_operation_hook "$opt"
+		;;
+	*"Remover Ferramenta"*)
+		ask_sudo
+		do_selective "uninstall"
 		post_operation_hook "$opt"
 		;;
 	*"Desinstalar"*)
