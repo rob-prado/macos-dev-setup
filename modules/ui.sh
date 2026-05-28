@@ -65,7 +65,7 @@ print_progress_bar() {
 	[[ $w -gt 50 ]] && w=50
 	local f=$((w * c / t))
 	local e=$((w - f))
-	printf '\n%s%s[%02d/%02d]%s %b%-15s%b %s%s%s%s%s\\n' \
+	printf '\n%s%s[%02d/%02d]%s %b%-15s%b %s%s%s%s%s\n' \
 		"$C_BOLD" "$C_C" "$c" "$t" "$C_RESET" \
 		"$C_BOLD" "${l:0:15}" "$C_RESET" \
 		"$C_G" "$(repeat_char "$f" '■')" \
