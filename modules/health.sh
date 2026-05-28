@@ -93,16 +93,16 @@ health_check() {
 	managed)
 		case "$tool" in
 		node)
-			mise exec node -- node -e 'process.exit(0)' 2>/dev/null || return 1
+			env MISE_AUTO_INSTALL=0 mise exec node -- node -e 'process.exit(0)' 2>/dev/null || return 1
 			;;
 		yarn)
-			[[ "$(mise exec yarn -- yarn -v 2>/dev/null)" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+			[[ "$(env MISE_AUTO_INSTALL=0 mise exec yarn -- yarn -v 2>/dev/null)" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
 			;;
 		java)
-			mise exec java -- command -v java &>/dev/null && mise exec java -- java -version 2>&1 | grep -qi 'openjdk' || return 1
+			env MISE_AUTO_INSTALL=0 mise exec java -- command -v java &>/dev/null && env MISE_AUTO_INSTALL=0 mise exec java -- java -version 2>&1 | grep -qi 'openjdk' || return 1
 			;;
 		ruby)
-			mise exec ruby -- command -v ruby &>/dev/null || return 1
+			env MISE_AUTO_INSTALL=0 mise exec ruby -- command -v ruby &>/dev/null || return 1
 			;;
 		xcode)
 			xcode-select -p &>/dev/null || return 1
