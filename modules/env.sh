@@ -156,6 +156,68 @@ if command -v mise &>/dev/null; then
   elif [[ -n "$BASH_VERSION" ]]; then
     eval "$(mise activate bash)"
   fi
+
+  _mise_find_up() {
+    local file="$1"
+    local dir="$PWD"
+    while [[ "$dir" != "/" && "$dir" != "$HOME" ]]; do
+      if [[ -f "$dir/$file" ]]; then
+        echo "$dir/$file"
+        return 0
+      fi
+      dir="$(dirname "$dir")"
+    done
+    return 1
+  }
+
+  _mise_legacy_files_hook() {
+    local nvmrc_path node_version_path ruby_version_path java_version_path
+
+    nvmrc_path=$(_mise_find_up .nvmrc)
+    node_version_path=$(_mise_find_up .node-version)
+    ruby_version_path=$(_mise_find_up .ruby-version)
+    java_version_path=$(_mise_find_up .java-version)
+
+    if [[ -n "$nvmrc_path" ]]; then
+      export MISE_NODE_VERSION=$(cat "$nvmrc_path" | tr -d 'v\n ')
+    elif [[ -n "$node_version_path" ]]; then
+      export MISE_NODE_VERSION=$(cat "$node_version_path" | tr -d 'v\n ')
+    else
+      unset MISE_NODE_VERSION
+    fi
+
+    if [[ -n "$ruby_version_path" ]]; then
+      export MISE_RUBY_VERSION=$(sed 's/^ruby-//' "$ruby_version_path" | tr -d '\n ')
+    else
+      unset MISE_RUBY_VERSION
+    fi
+
+    if [[ -n "$java_version_path" ]]; then
+      local jv
+      jv=$(cat "$java_version_path" | tr -d '\n ')
+      if [[ "$jv" =~ ^([0-9]+)\.[0-9\.]+-(.*)$ ]]; then
+        # zsh compatible regex match for SDKMAN: e.g. 21.0.11-zulu -> zulu-21
+        jv="${match[2]:-${BASH_REMATCH[2]}}-${match[1]:-${BASH_REMATCH[1]}}"
+      elif [[ "$jv" == *-* ]]; then
+        jv=$(echo "$jv" | sed -E 's/^([0-9]+)\.[0-9\.]+-(.*)$/\2-\1/')
+      fi
+      export MISE_JAVA_VERSION="$jv"
+    else
+      unset MISE_JAVA_VERSION
+    fi
+  }
+
+  if [[ -n "$ZSH_VERSION" ]]; then
+    autoload -U add-zsh-hook
+    add-zsh-hook chpwd _mise_legacy_files_hook
+  elif [[ -n "$BASH_VERSION" ]]; then
+    if [[ -z "$PROMPT_COMMAND" ]]; then
+      PROMPT_COMMAND="_mise_legacy_files_hook"
+    elif [[ "$PROMPT_COMMAND" != *"_mise_legacy_files_hook"* ]]; then
+      PROMPT_COMMAND="$PROMPT_COMMAND; _mise_legacy_files_hook"
+    fi
+  fi
+  _mise_legacy_files_hook
 fi
 EOF
 
