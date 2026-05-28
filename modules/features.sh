@@ -443,7 +443,11 @@ process_tool() {
 				"installed" \
 				brew install "${type:+--$type}" "$tool" || true
 		fi
-		fv=$(brew list --versions "$tool" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+		if [[ "$type" == "cask" ]]; then
+			fv=$(brew list --cask --versions "$tool" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+		else
+			fv=$(brew list --versions "$tool" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+		fi
 	fi
 	if [[ "$type" != "managed" && -n "${fv:-}" ]]; then
 		c_set_version "$tool" "$fv"
