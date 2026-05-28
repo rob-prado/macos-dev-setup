@@ -77,6 +77,8 @@ EOF
 pf_reconcile_order() {
 	[[ -f "$ENV_FILE" ]] || return 0
 
+	sed -i '' '/if command -v mise/,/^fi$/d' "$ENV_FILE" 2>/dev/null || true
+
 	local android_home=""
 	local -a misc_lines=()
 	local in_sudo=false
@@ -102,8 +104,6 @@ pf_reconcile_order() {
 
 		if [[ "$line" == "export ANDROID_HOME="* ]]; then
 			android_home=$(echo "$line" | sed -E 's/^export ANDROID_HOME="?([^"]*)"?/\1/')
-		elif [[ "$line" == *"mise activate"* ]]; then
-			continue
 		elif [[ "$line" == "export PATH="* && "$line" == *"\$ANDROID_HOME"* ]]; then
 			continue
 		elif [[ -n "${line//[[:space:]]/}" ]]; then
