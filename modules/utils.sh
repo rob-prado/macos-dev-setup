@@ -33,7 +33,7 @@ safe_curl() {
 run_in_ruby_env() {
 	local cmd="$1"
 	if command -v mise &>/dev/null; then
-		mise exec ruby -- bash -c "$cmd"
+		env MISE_AUTO_INSTALL=0 mise exec ruby -- bash -c "$cmd"
 	else
 		bash -c "$cmd"
 	fi
