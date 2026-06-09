@@ -193,15 +193,7 @@ if command -v mise &>/dev/null; then
     fi
 
     if [[ -n "$java_version_path" ]]; then
-      local jv
-      jv=$(cat "$java_version_path" | tr -d '\n ')
-      if [[ "$jv" =~ ^([0-9]+)\.[0-9\.]+-(.*)$ ]]; then
-        # zsh compatible regex match for SDKMAN: e.g. 21.0.11-zulu -> zulu-21
-        jv="${match[2]:-${BASH_REMATCH[2]}}-${match[1]:-${BASH_REMATCH[1]}}"
-      elif [[ "$jv" == *-* ]]; then
-        jv=$(echo "$jv" | sed -E 's/^([0-9]+)\.[0-9\.]+-(.*)$/\2-\1/')
-      fi
-      export MISE_JAVA_VERSION="$jv"
+      export MISE_JAVA_VERSION=$(cat "$java_version_path" | tr -d '\n ')
     else
       unset MISE_JAVA_VERSION
     fi

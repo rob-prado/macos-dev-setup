@@ -41,11 +41,7 @@ install_managed() {
 		local lv=""
 		case "$manager" in
 		mise)
-			if [[ "$tool" == "java" ]]; then
-				lv=$(mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru | head -1 || true)
-			else
-				lv=$(mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vr | head -1 || true)
-			fi
+			lv=$(mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vr | head -1 || true)
 			;;
 		xcodes) lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | awk '{print $1}' 2>/dev/null || echo "") ;;
 		esac
@@ -68,12 +64,6 @@ install_managed() {
 		for v in "${uv[@]}"; do
 			local success=false iv
 			local mise_ver="$v"
-			if [[ "$tool" == "java" ]]; then
-				mise_ver="zulu-$v"
-				if ! mise ls-remote java 2>/dev/null | grep -q "$mise_ver"; then
-					mise_ver="zulu-${v%%.*}"
-				fi
-			fi
 			
 			iv=$(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && $2=="'"$mise_ver"'" && !/\(missing\)/ {print $2}' || true)
 			if [[ -n "$iv" ]]; then
@@ -152,7 +142,7 @@ uninstall_managed_version() {
 	case "$manager" in
 	mise)
 		if command -v mise &>/dev/null; then
-			readarray -t inst_versions < <(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' || true)
+			readarray -t inst_versions < <(mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' || true)
 		fi
 		;;
 	xcodes)
@@ -208,12 +198,6 @@ uninstall_managed_version() {
 		case "$manager" in
 		mise)
 			local mise_ver="$v"
-			if [[ "$tool" == "java" ]]; then
-				mise_ver="zulu-$v"
-				if ! mise ls-remote java 2>/dev/null | grep -q "$mise_ver"; then
-					mise_ver="zulu-${v%%.*}"
-				fi
-			fi
 			run_step "Removing" "${tool^} $v" "${tool^} $v" "${tool^} $v" "removed" mise uninstall "$tool@$mise_ver"
 			;;
 		xcodes)
@@ -236,12 +220,6 @@ uninstall_managed_version() {
 		if [[ "$manager" == "mise" ]]; then
 			local latest_v="${rem_versions[-1]}"
 			local latest_mise_ver="$latest_v"
-			if [[ "$tool" == "java" ]]; then
-				latest_mise_ver="zulu-$latest_v"
-				if ! mise ls-remote java 2>/dev/null | grep -q "$latest_mise_ver"; then
-					latest_mise_ver="zulu-${latest_v%%.*}"
-				fi
-			fi
 			mise use -g "$tool@$latest_mise_ver" >/dev/null 2>&1 || true
 		fi
 	fi
@@ -492,7 +470,7 @@ remove_untracked_versions() {
 		case "$mgr" in
 		mise)
 			readarray -t inst < <(
-				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' | sed 's/^zulu-//' || true
+				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' || true
 			)
 			;;
 		xcodes)
@@ -513,7 +491,6 @@ remove_untracked_versions() {
 				case "$mgr" in
 				mise)
 					local mise_ver="$iv"
-					[[ "$tool" == "java" ]] && mise_ver="zulu-$iv"
 					run_bg "RM ${tool^}" "$iv" mise uninstall "$tool@$mise_ver" || true
 					;;
 				xcodes)

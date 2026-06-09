@@ -62,7 +62,6 @@ is_tool_version_installed() {
 		mise)
 			if command -v mise &>/dev/null; then
 				local mise_ver="$ver"
-				[[ "$tool" == "java" ]] && mise_ver="zulu-$ver"
 				mise ls "$tool" 2>/dev/null | awk '$1=="'"$tool"'" && !/\(missing\)/ {print $2}' | grep -qE "^$mise_ver(\.|$)" && return 0
 			fi
 			;;
@@ -537,7 +536,7 @@ sync_project_context() {
 			to_merge+=("$item")
 		elif [[ -n "$ver" ]]; then
 			local has_ver
-			has_ver=$(jq -r --arg t "$tool" --arg v "$ver" 'if .tools[$t].versions then .tools[$t].versions[] | select(. == $v) else empty end' "$CATALOG_FILE" 2>/dev/null)
+			has_ver=$(jq -r --arg t "$tool" --arg v "$ver" 'if .tools[$t].versions then .tools[$t].versions[] | select(. == $v or startswith($v + ".") or startswith($v + "-")) else empty end' "$CATALOG_FILE" 2>/dev/null)
 			[[ -z "$has_ver" ]] && to_merge+=("$item")
 		fi
 

@@ -77,11 +77,7 @@ get_remote_versions() {
 	local tool="$1" manager="$2"
 	case "$manager" in
 	mise)
-		if [[ "$tool" == "java" ]]; then
-			mise ls-remote java 2>/dev/null | grep -i zulu | grep -vE '(ea|fx)' | grep -oE 'zulu-[0-9.]+' | sed 's/^zulu-//' | sort -Vru || true
-		else
-			mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vru || true
-		fi
+		mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vru || true
 		;;
 	xcodes)
 		xcodes list 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]' | sort -Vru
