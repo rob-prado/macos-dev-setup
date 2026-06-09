@@ -67,7 +67,7 @@ is_tool_version_installed() {
 			;;
 		xcodes)
 			if command -v xcodes &>/dev/null; then
-				xcodes installed 2>/dev/null | awk '{print $1}' | grep -qE "^$ver(\.|$)" && return 0
+				xcodes installed 2>/dev/null | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' | grep -qE "^$ver(\.|$)" && return 0
 			fi
 			;;
 		esac

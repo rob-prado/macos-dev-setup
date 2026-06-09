@@ -80,7 +80,7 @@ get_remote_versions() {
 		mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vru || true
 		;;
 	xcodes)
-		xcodes list 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]' | sort -Vru
+		xcodes list 2>/dev/null | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' | grep -E '^[0-9]' | sort -Vru
 		;;
 	esac
 }
@@ -104,7 +104,7 @@ ask_sudo() {
 	msg "$C_Y" "🔑 Privileges required:"
 	sudo -v
 	while true; do
-		sudo -n true
+		sudo -n -v
 		sleep 60
 		kill -0 "$$" || exit
 	done 2>/dev/null &

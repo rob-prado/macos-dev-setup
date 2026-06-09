@@ -43,7 +43,13 @@ install_managed() {
 		mise)
 			lv=$(mise ls-remote "$tool" 2>/dev/null | grep -E '^[0-9]+(\.[0-9]+)*$' | sort -Vr | head -1 || true)
 			;;
-		xcodes) lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | awk '{print $1}' 2>/dev/null || echo "") ;;
+		xcodes)
+			if [[ $(sw_vers -buildVersion 2>/dev/null) =~ [a-zA-Z]$ ]]; then
+				lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | sort -Vr | head -1 | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' 2>/dev/null || echo "")
+			else
+				lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' 2>/dev/null || echo "")
+			fi
+			;;
 		esac
 		if [[ -n "${lv:-}" && "$lv" != "null" ]]; then
 			versions+=("$lv")
@@ -147,7 +153,7 @@ uninstall_managed_version() {
 		;;
 	xcodes)
 		if command -v xcodes &>/dev/null; then
-			readarray -t inst_versions < <(xcodes installed 2>/dev/null | awk '{print $1}' || true)
+			readarray -t inst_versions < <(xcodes installed 2>/dev/null | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' || true)
 		fi
 		;;
 	esac
@@ -269,7 +275,7 @@ process_tool() {
 			xcodes)
 				local -a x_vers=()
 				if command -v xcodes &>/dev/null; then
-					readarray -t x_vers < <(xcodes installed 2>/dev/null | awk '{print $1}' || true)
+					readarray -t x_vers < <(xcodes installed 2>/dev/null | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' || true)
 					for xv in "${x_vers[@]}"; do
 						if [[ -n "${xv:-}" ]]; then
 							run_step "Removing" "Xcode $xv" "Xcode $xv" "Xcode $xv" "removed" sudo xcodes uninstall "$xv" || true
@@ -391,19 +397,24 @@ process_tool() {
 				else
 					bv=$(brew list --versions "$tool" 2>/dev/null | awk '{print $NF}' 2>/dev/null || echo "")
 				fi
-				if run_bg "Update" "$tool" brew upgrade "${type:+--$type}" "$tool"; then
-					if [[ "$type" == "cask" ]]; then
-						av=$(brew list --cask --versions "$tool" 2>/dev/null | awk '{print $NF}' 2>/dev/null || echo "")
-					else
-						av=$(brew list --versions "$tool" 2>/dev/null | awk '{print $NF}' 2>/dev/null || echo "")
-					fi
-					if [[ "${bv:-}" != "${av:-}" ]]; then
-						audit_log updated "$tool ${bv:-}→${av:-}"
-					else
-						audit_log uptodate "$tool"
-					fi
+				if ! brew outdated "${type:+--$type}" "$tool" 2>/dev/null | grep -q "^$tool"; then
+					printf '\r%s✓ %s up to date%s\n' "${C_D}" "$tool" "${C_RESET}"
+					audit_log uptodate "$tool"
 				else
-					audit_log failed "$tool"
+					if run_bg "Update" "$tool" brew upgrade "${type:+--$type}" "$tool"; then
+						if [[ "$type" == "cask" ]]; then
+							av=$(brew list --cask --versions "$tool" 2>/dev/null | awk '{print $NF}' 2>/dev/null || echo "")
+						else
+							av=$(brew list --versions "$tool" 2>/dev/null | awk '{print $NF}' 2>/dev/null || echo "")
+						fi
+						if [[ "${bv:-}" != "${av:-}" ]]; then
+							audit_log updated "$tool ${bv:-}→${av:-}"
+						else
+							audit_log uptodate "$tool"
+						fi
+					else
+						audit_log failed "$tool"
+					fi
 				fi
 			else
 				printf '\r%s✓ %s ok%s\n' \
@@ -449,10 +460,11 @@ process_tool() {
 		pf_add "export PATH=\"\$ANDROID_HOME/emulator:\$ANDROID_HOME/platform-tools:\$PATH\""
 	fi
 	if [[ "$tool" == "xcode" && "$mode" != "uninstall" ]]; then
-		run_bg "License" "Xcode" sudo xcodebuild -license accept || true
+		sudo -v
 		local xp
-		xp=$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'" 2>/dev/null | head -1)
+		xp=$(mdfind "kMDItemCFBundleIdentifier == 'com.apple.dt.Xcode'" 2>/dev/null | grep '^/Applications' | sort -V | tail -1)
 		[[ -n "${xp:-}" ]] && run_bg "Select" "Xcode" sudo xcode-select -s "$xp/Contents/Developer" || true
+		run_bg "License" "Xcode" sudo xcodebuild -license accept || true
 	fi
 }
 
@@ -475,7 +487,7 @@ remove_untracked_versions() {
 			;;
 		xcodes)
 			readarray -t inst < <(
-				xcodes installed 2>/dev/null | awk '{print $1}' || true
+				xcodes installed 2>/dev/null | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' || true
 			)
 			;;
 		esac

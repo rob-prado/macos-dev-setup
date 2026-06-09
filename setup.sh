@@ -12,6 +12,14 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 export HOMEBREW_NO_ENV_HINTS=1
 
+if [[ $(sw_vers -productVersion 2>/dev/null | awk -F. '{print $1}') -ge 15 ]]; then
+	brew_err=$(brew info git 2>&1 || true)
+	if echo "$brew_err" | grep -qE '(unknown or unsupported macOS version|_dunno\.jws\.json)'; then
+		LATEST_MAC_VER=$(grep -E '^[[:space:]]*[a-z_]+:[[:space:]]+"[0-9]+(\.[0-9]+)*",' "$(brew --repository)/Library/Homebrew/macos_version.rb" 2>/dev/null | grep -Eo '"[0-9]+(\.[0-9]+)*"' | tr -d '"' | sort -V | tail -1)
+		export HOMEBREW_FAKE_MACOS="${LATEST_MAC_VER:-14.0}"
+	fi
+fi
+
 if [[ -d "/opt/homebrew/bin" && ! "$PATH" =~ "/opt/homebrew/bin" ]]; then
 	export PATH="/opt/homebrew/bin:$PATH"
 fi
