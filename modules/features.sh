@@ -15,6 +15,7 @@ install_managed() {
 		command -v mise &>/dev/null || retry 3 brew install mise
 		grep -q 'mise activate' "$ENV_FILE" 2>/dev/null || \
 			pf_add "eval \"\$(mise activate \${SHELL##*/})\""
+		mise settings set ruby.compile false >/dev/null 2>&1 || true
 		;;
 	xcodes) command -v xcodes &>/dev/null || retry 3 brew install xcodes ;;
 	esac
