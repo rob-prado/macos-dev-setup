@@ -32,14 +32,15 @@ tui_choose() {
             return 1
         fi
     else
-        printf "\n%b%s%b\n" "$C_Y" "$prompt" "$C_RESET"
+        printf "\n%b%s%b\n" "$C_Y" "$prompt" "$C_RESET" >&2
         local i=1
         for opt in "$@"; do
-            printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$opt"
+            printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$opt" >&2
             ((i++))
         done
-        printf "\n%bChoose [1-%d]:%b " "$C_D" "$#" "$C_RESET"
-        read -r sel
+        printf "\n%bChoose [1-%d]:%b " "$C_D" "$#" "$C_RESET" >&2
+        
+        read -r sel < /dev/ttyss
         [[ -n "${sel:-}" && "$sel" -ge 1 && "$sel" -le $# ]] && echo "${!sel}" || return 1
     fi
 }
@@ -67,14 +68,15 @@ tui_multi_choose() {
         rm -f "$tmp"
         return $status
     else
-        printf "\n%b%s%b\n" "$C_Y" "$prompt" "$C_RESET"
+        printf "\n%b%s%b\n" "$C_Y" "$prompt" "$C_RESET" >&2
         local i=1
         for opt in "$@"; do
-            printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$opt"
+            printf "  %b%2d)%b %s\n" "$C_C" "$i" "$C_RESET" "$opt" >&2
             ((i++))
         done
-        printf "\n%bSelect (numbers separated by spaces):%b " "$C_D" "$C_RESET"
-        read -r -a sel_arr
+        printf "\n%bSelect (numbers separated by spaces):%b " "$C_D" "$C_RESET" >&2
+        
+        read -r -a sel_arr < /dev/tty
         for s in "${sel_arr[@]}"; do
             local idx=$((s - 1))
             [[ $idx -ge 0 && $idx -lt $# ]] && echo "${!s}"

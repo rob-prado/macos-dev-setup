@@ -163,6 +163,27 @@ pre_flight_checks() {
 	[[ -w "$HOME" ]] || err "No write permission to \$HOME"
 }
 
+bootstrap_ui_tools() {
+	local missing_deps=()
+	
+	# Verifica se as flags (definidas no topo do script) estão falsas
+	[[ "$HAS_GUM" == "false" ]] && missing_deps+=("gum")
+	[[ "$HAS_GLOW" == "false" ]] && missing_deps+=("glow")
+
+	if [[ ${#missing_deps[@]} -gt 0 ]]; then
+		msg "$C_C" "⚙️  Bootstrapping UI dependencies (${missing_deps[*]})..."
+		
+		# Instala silenciosamente em background usando o Homebrew
+		for dep in "${missing_deps[@]}"; do
+			brew install "$dep" >/dev/null 2>&1 || true
+		done
+		
+		# Revalida as variáveis globais para liberar a TUI
+		command -v gum >/dev/null 2>&1 && HAS_GUM=true
+		command -v glow >/dev/null 2>&1 && HAS_GLOW=true
+	fi
+}
+
 full_uninstall() {
 	confirm_destructive "DELETE EVERYTHING (SDKs, Rubies, Xcodes, Configs)?" || return 0
 	local -a tools
@@ -530,6 +551,9 @@ main() {
 
 	msg "$C_C" "🔍 Checking connectivity and native dependencies..."
 	pre_flight_checks
+
+	msg "$C_C" "🔧 Bootstrapping UI Dependencies..."
+	bootstrap_ui_tools
 
 	msg "$C_C" "📦 Initializing tool catalog..."
 	catalog_init
