@@ -9,9 +9,22 @@ cleanup() {
 		"${TMP_FILES[@]:-}" 2>/dev/null || true
 }
 
+apply_macos_compat() {
+	if [[ $(sw_vers -productVersion 2>/dev/null | awk -F. '{print $1}') -ge 15 ]]; then
+		local brew_err
+		brew_err=$(brew info git 2>&1 || true)
+		if echo "$brew_err" | grep -qE '(unknown or unsupported macOS version|_dunno\.jws\.json)'; then
+			local LATEST_MAC_VER
+			LATEST_MAC_VER=$(grep -E '^[[:space:]]*[a-z_]+:[[:space:]]+"[0-9]+(\.[0-9]+)*",' "$(brew --repository)/Library/Homebrew/macos_version.rb" 2>/dev/null | grep -Eo '"[0-9]+(\.[0-9]+)*"' | tr -d '"' | sort -V | tail -1)
+			export HOMEBREW_FAKE_MACOS="${LATEST_MAC_VER:-14.0}"
+		fi
+	fi
+}
+
 ensure_modern_bash_and_deps() {
 	if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
 		if [[ ! -x "$BREW_BASH" ]]; then
+			apply_macos_compat
 			command -v brew >/dev/null 2>&1 || /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" >/dev/null
 			eval "$("$BREW_PREFIX/bin/brew" shellenv)"
 			brew install bash jq zip unzip >/dev/null 2>&1 || true
@@ -19,6 +32,7 @@ ensure_modern_bash_and_deps() {
 		exec "$BREW_BASH" "$0" "$@"
 	fi
 	if ! command -v jq >/dev/null 2>&1; then
+		apply_macos_compat
 		brew install jq zip unzip >/dev/null 2>&1 || {
 			printf '\n%s\n' "${C_R}❌ jq missing${C_RESET}" >/dev/2
 			exit 1

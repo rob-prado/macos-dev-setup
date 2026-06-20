@@ -8,7 +8,14 @@ install_managed() {
 	else
 		readarray -t versions < <(c_get_versions "$tool")
 	fi
-	brew list "$tool" &>/dev/null && run_bg "Cleaning" "$tool" brew uninstall --force "$tool" || true
+	if brew list "$tool" &>/dev/null; then
+		local brew_version=""
+		brew_version=$(brew list --versions "$tool" 2>/dev/null | awk '{print $NF}' | head -1 || true)
+		if [[ -n "$brew_version" ]]; then
+			versions+=("$brew_version")
+		fi
+		run_bg "Cleaning" "$tool" brew uninstall --ignore-dependencies --force "$tool" || true
+	fi
 
 	case "$manager" in
 	mise)
@@ -271,7 +278,7 @@ process_tool() {
 			mise)
 				run_step "Removing" "$tool" "${tool^} versions" "${tool^} versions" "removed" mise uninstall --all "$tool" || audit_log missing "$tool"
 				mise use -g --remove "$tool" >/dev/null 2>&1 || true
-				brew list "$tool" &>/dev/null && run_bg "Cleaning" "$tool" brew uninstall --force "$tool" || true
+				brew list "$tool" &>/dev/null && run_bg "Cleaning" "$tool" brew uninstall --ignore-dependencies --force "$tool" || true
 				;;
 			xcodes)
 				local -a x_vers=()
@@ -285,12 +292,12 @@ process_tool() {
 				fi
 				;;
 			*)
-				run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$mgr" || audit_log missing "$tool"
+				run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --ignore-dependencies --force "$mgr" || audit_log missing "$tool"
 				;;
 			esac
 			;;
 		*)
-			run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --force "$tool" || audit_log missing "$tool"
+			run_step "Removing" "$tool" "$tool" "$tool" "removed" brew uninstall --ignore-dependencies --force "$tool" || audit_log missing "$tool"
 			;;
 		esac
 		update_lock_entry "$tool" "" "removed"
@@ -446,15 +453,6 @@ process_tool() {
 	if [[ "$type" != "managed" && -n "${fv:-}" ]]; then
 		c_set_version "$tool" "$fv"
 	fi
-	if [[ "$mode" != "uninstall" ]] && ! health_check "$tool" "$type"; then
-		audit_log failed "$tool (health)"
-		warn "Health check failed: $tool"
-	fi
-	local st="installed"
-	if [[ "$mode" == "update" ]]; then
-		st="updated"
-	fi
-	update_lock_entry "$tool" "${fv:-}" "$st"
 	if [[ "$tool" == "android-studio" ]]; then
 		pf_set_env "ANDROID_HOME" "$HOME/Library/Android/Sdk"
 		pf_rm_pat "ANDROID_HOME/emulator"
@@ -467,6 +465,17 @@ process_tool() {
 		[[ -n "${xp:-}" ]] && run_bg "Select" "Xcode" sudo xcode-select -s "$xp/Contents/Developer" || true
 		run_bg "License" "Xcode" sudo xcodebuild -license accept || true
 	fi
+
+	if [[ "$mode" != "uninstall" ]] && ! health_check "$tool" "$type"; then
+		audit_log failed "$tool (health)"
+		warn "Health check failed: $tool"
+	fi
+	local st="installed"
+	if [[ "$mode" == "update" ]]; then
+		st="updated"
+	fi
+	update_lock_entry "$tool" "${fv:-}" "$st"
+
 }
 
 remove_untracked_versions() {

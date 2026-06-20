@@ -12,13 +12,7 @@ export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 export HOMEBREW_NO_ENV_HINTS=1
 
-if [[ $(sw_vers -productVersion 2>/dev/null | awk -F. '{print $1}') -ge 15 ]]; then
-	brew_err=$(brew info git 2>&1 || true)
-	if echo "$brew_err" | grep -qE '(unknown or unsupported macOS version|_dunno\.jws\.json)'; then
-		LATEST_MAC_VER=$(grep -E '^[[:space:]]*[a-z_]+:[[:space:]]+"[0-9]+(\.[0-9]+)*",' "$(brew --repository)/Library/Homebrew/macos_version.rb" 2>/dev/null | grep -Eo '"[0-9]+(\.[0-9]+)*"' | tr -d '"' | sort -V | tail -1)
-		export HOMEBREW_FAKE_MACOS="${LATEST_MAC_VER:-14.0}"
-	fi
-fi
+
 
 if [[ -d "/opt/homebrew/bin" && ! "$PATH" =~ "/opt/homebrew/bin" ]]; then
 	export PATH="/opt/homebrew/bin:$PATH"
@@ -37,7 +31,13 @@ else
 	readonly C_R=$'\033[1;31m' C_C=$'\033[1;36m' C_W=$'\033[1;37m' C_D=$'\033[2m'
 fi
 
-BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+if [[ -x /opt/homebrew/bin/brew ]]; then
+	BREW_PREFIX="/opt/homebrew"
+elif [[ -x /usr/local/bin/brew ]]; then
+	BREW_PREFIX="/usr/local"
+else
+	BREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+fi
 readonly BREW_PREFIX
 readonly BREW_BASH="$BREW_PREFIX/bin/bash"
 readonly DEFAULT_CATALOG="$HOME/.mac-dev-catalog.json"
@@ -158,6 +158,7 @@ source "$SCRIPT_DIR/modules/project.sh"
 # ==============================================================================
 
 pre_flight_checks() {
+	apply_macos_compat
 	safe_curl -s --head --request GET https://www.apple.com/library/test/success.html >/dev/null 2>&1 || err "No internet connection."
 	for d in git curl awk grep sed find xargs; do command -v "$d" >/dev/null 2>&1 || err "Missing native dependency: $d"; done
 	[[ -w "$HOME" ]] || err "No write permission to \$HOME"

@@ -4,11 +4,14 @@ spin_with_context() {
 	local pid=$1 m=$2 out_f=$3 err_f=$4 ctx=$5 s='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0 status=0
 	while kill -0 "$pid" 2>/dev/null; do
 		i=$(((i + 1) % 10))
-		local max_len=$((TERM_WIDTH - 35))
+		local current_width=$(tput cols 2>/dev/null || echo 80)
+		local ctx_len=${#ctx}
+		local prefix_len=$(( 20 + ctx_len ))
+		local max_len=$((current_width - prefix_len - 5))
 		[[ $max_len -lt 10 ]] && max_len=10
 		local last_line=""
 		if [[ -f "$out_f" ]]; then
-			last_line=$(tail -n 1 "$out_f" 2>/dev/null | tr -d '\r\n' | cut -c 1-$max_len || true)
+			last_line=$(tail -n 1 "$out_f" 2>/dev/null | sed -E $'s/\033\\[[0-9;]*[a-zA-Z]//g' | tr -d '\r\n' | cut -c 1-"$max_len" || true)
 		fi
 		if [[ -n "${last_line:-}" ]]; then
 			printf "\r  %b%s%b  %-12s %b%s%b: %s\033[K" "$C_Y" "${s:$i:1}" "$C_RESET" "$m" "$C_D" "$ctx" "$C_RESET" "$last_line" >&2
