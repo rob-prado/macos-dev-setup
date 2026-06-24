@@ -333,12 +333,21 @@ do_selective() {
 		local -a sn
 		read -r -a sn </dev/tty
 		for s in "${sn[@]}"; do
-			local idx=$((s - 1))
-			if [[ $idx -ge 0 && $idx -lt ${#display_tools[@]} ]]; then
-				local val="${display_tools[$idx]}"
-				if [[ -n "${val:-}" ]]; then
-					selected+=("$val")
+			if [[ "$s" =~ ^[0-9]+$ ]]; then
+				local idx=$((s - 1))
+				if [[ $idx -ge 0 && $idx -lt ${#display_tools[@]} ]]; then
+					local val="${display_tools[$idx]}"
+					if [[ -n "${val:-}" ]]; then
+						selected+=("$val")
+					fi
 				fi
+			else
+				for tool in "${display_tools[@]}"; do
+					if [[ "$s" == "$tool" ]]; then
+						selected+=("$tool")
+						break
+					fi
+				done
 			fi
 		done
 	fi
