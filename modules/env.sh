@@ -23,11 +23,11 @@ get_target_rc() {
 }
 
 ensure_env_sudo_wrapper() {
-	if ! grep -q "sudo() {" "$ENV_FILE" 2>/dev/null; then
+	if ! grep -Eq "('sudo'|\"sudo\"|\\bsudo)\(\) \{" "$ENV_FILE" 2>/dev/null; then
 		cat <<'EOF' >>"$ENV_FILE"
 
 # Custom sudo wrapper to show password prompts cleanly on the line below
-sudo() {
+'sudo'() {
 	local has_n=false
 	for arg in "$@"; do
 		if [[ "$arg" == "-n" ]]; then
@@ -125,7 +125,7 @@ EOF
 	cat <<'EOF' >>"$tmp"
 
 # Custom sudo wrapper to show password prompts cleanly on the line below
-sudo() {
+'sudo'() {
 	local has_n=false
 	for arg in "$@"; do
 		if [[ "$arg" == "-n" ]]; then

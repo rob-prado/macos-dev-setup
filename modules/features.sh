@@ -55,7 +55,7 @@ install_managed() {
 			if [[ $(sw_vers -buildVersion 2>/dev/null) =~ [a-zA-Z]$ ]]; then
 				lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | sort -Vr | head -1 | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' 2>/dev/null || echo "")
 			else
-				lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -vE '(Beta|RC)' | sort -Vr | head -1 | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' 2>/dev/null || echo "")
+				lv=$(xcodes list 2>/dev/null | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)? ' | grep -ivE '(beta|rc|release candidate)' | sort -Vr | head -1 | sed -E 's/ \([^\)]+\)//g' | awk '{$1=$1;print}' 2>/dev/null || echo "")
 			fi
 			;;
 		esac
